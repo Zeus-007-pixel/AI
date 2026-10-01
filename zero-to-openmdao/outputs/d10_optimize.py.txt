@@ -1,0 +1,11 @@
+Optimization terminated successfully    (Exit mode 0)
+            Current function value: -27.0
+            Iterations: 2
+            Function evaluations: 2
+            Gradient evaluations: 2
+Optimization Complete
+-----------------------------------
+Success: True
+x = [7.]
+y = [-7.]
+f = [-27.]

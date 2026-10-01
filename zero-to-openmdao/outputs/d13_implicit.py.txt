@@ -1,0 +1,5 @@
+NL: Newton 0 ; 1842.5 1
+NL: Newton 1 ; 0 0
+NL: Newton Converged
+Trim angle of attack: 4.588 deg
+Lift: 4905.000 N

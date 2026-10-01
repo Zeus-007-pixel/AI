@@ -1,0 +1,103 @@
+<section class="day" id="day-11">
+<header class="day-head">
+  <p class="eyebrow">Week 3 · Deeper OpenMDAO, then Dymos</p>
+  <h2><span class="dn">Day 11</span> Derivatives</h2>
+  <dl class="meta">
+    <dt>Time</dt><dd>3–4 hours</dd>
+    <dt>Goal</dt><dd>Understand what partial derivatives are and why optimizers need them, compare the three ways to compute them, and write and check exact ones yourself.</dd>
+  </dl>
+</header>
+
+<div class="warmup">
+  <h3>Warm-up from memory</h3>
+  <ol>
+    <li>Name the three kinds of declarations that turn a model into an optimization problem.</li>
+    <li>What does <code>ref=10.0</code> do on a design variable?</li>
+    <li>What happened on Day 10 when <code>declare_partials</code> was missing?</li>
+  </ol>
+  <details class="answer"><summary>Answers</summary>
+    <p>1. <code>add_design_var</code>, <code>add_objective</code> and <code>add_constraint</code>. 2. It scales it: the optimizer works with value/10, so it's about 1. 3. The optimizer thought the objective didn't depend on x and y, stopped immediately, and reported success with a wrong answer.</p>
+  </details>
+</div>
+
+<h3 id="d11-1"><span class="sec">11.1</span>What a derivative is, in plain words</h3>
+<p>A <strong>derivative</strong> is a slope: how much an output changes when you nudge an input a tiny bit. If q = ½ρv² and you raise v by 1 m/s, q goes up by about ρv pascals. That ρv is the derivative of q with respect to v.</p>
+<p>When an output depends on several inputs, a <strong>partial derivative</strong> is the slope with respect to <em>one</em> input while the others are held fixed. It's written ∂q/∂v (said "partial q, partial v"). In OpenMDAO code it's written <code>partials['q', 'v']</code>, and the two names are called <em>of</em> (the output) and <em>wrt</em> ("with respect to", the input).</p>
+<p>Why optimizers need them: SLSQP stands on the current design and asks "which way is downhill, and how steep?" The partial derivatives answer that. OpenMDAO collects every component's partials and combines them, using the chain rule, into the <em>total</em> derivatives of the objective and constraints with respect to the design variables. Good derivatives mean fast, reliable optimization. Wrong derivatives mean failure, or a wrong answer.</p>
+
+<h3 id="d11-2"><span class="sec">11.2</span>Three ways to get derivatives</h3>
+<div class="table-wrap"><table>
+  <thead><tr><th>Method</th><th>How it works</th><th>Accuracy</th><th>Speed</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Finite difference</strong> <code>method='fd'</code></td><td>Nudge the input by a small step h, rerun, and compare: (f(x+h) − f(x)) / h.</td><td>approximate</td><td>slow</td></tr>
+    <tr><td><strong>Complex step</strong> <code>method='cs'</code></td><td>A clever trick with imaginary numbers that avoids the rounding problem of FD.</td><td>exact to computer precision</td><td>slow</td></tr>
+    <tr><td><strong>Analytic</strong> (you write them)</td><td>You differentiate the formulas by hand and code the results in <code>compute_partials</code>.</td><td>exact</td><td>fastest</td></tr>
+  </tbody>
+</table></div>
+<p>Here's why FD is only approximate. New file <code>d11_fd_error.py</code> compares both methods on sin(x), whose true slope is cos(x):</p>
+{{code:d11_fd_error.py}}
+{{out:d11_fd_error.py}}
+<p>FD has a dilemma. A big step is inaccurate because the curve bends within the step. A tiny step also goes wrong, because subtracting two nearly equal numbers loses digits to rounding (h = 1e-12 is <em>worse</em> than 1e-8). Complex step has no subtraction, so it just gets better as h shrinks. (<code>1j</code> is Python's imaginary unit. You never need to do complex maths yourself; OpenMDAO does it for you.)</p>
+<aside class="callout warn">
+  <p class="callout-h">Making code "complex-safe" for method='cs'</p>
+  <p>Complex step sends complex numbers through your <code>compute</code>. Most NumPy math handles them fine. Avoid things that throw away the imaginary part: <code>abs()</code> and <code>np.abs()</code>, <code>float(...)</code>, <code>if</code> tests on input values, and <code>math.</code> functions. If cs gives strange derivatives, look for these.</p>
+</aside>
+
+<h3 id="d11-3"><span class="sec">11.3</span>Writing analytic partials</h3>
+<p>For q = ½ρv², the partials are ∂q/∂ρ = ½v² and ∂q/∂v = ρv. New file <code>d11_analytic.py</code>:</p>
+{{code:d11_analytic.py}}
+{{out:d11_analytic.py}}
+<dl class="lines">
+  <dt><code>self.declare_partials('q', 'rho')</code></dt>
+  <dd>"Output <code>q</code> depends on input <code>rho</code>, and I'll provide the derivative." There's no <code>method</code>, which means you'll write it yourself. Declare one line per (output, input) pair that has a non-zero derivative. Pairs you don't declare are treated as zero.</dd>
+  <dt><code>def compute_partials(self, inputs, partials):</code></dt>
+  <dd>A fourth method OpenMDAO calls, whenever the optimizer needs derivatives. <code>partials</code> works like a dictionary keyed by <code>(output, input)</code> pairs.</dd>
+  <dt><code>partials['q', 'rho'] = 0.5 * v**2</code></dt>
+  <dd>Store ∂q/∂ρ.</dd>
+  <dt><code>p.setup(force_alloc_complex=True)</code></dt>
+  <dd>Lets OpenMDAO use complex numbers for checking, even though this component doesn't use cs itself.</dd>
+  <dt><code>p.check_partials(method='cs', compact_print=True, show_only_incorrect=True)</code></dt>
+  <dd>OpenMDAO computes every derivative a second way (complex step) and compares it with yours. <code>show_only_incorrect=True</code> means it prints <strong>only problems</strong>, so empty output means all your derivatives are right.</dd>
+</dl>
+<p>Always run <code>check_partials</code> after writing analytic derivatives. It's the single most useful debugging tool in OpenMDAO.</p>
+
+<h3 id="d11-4"><span class="sec">11.4</span>Catching a wrong derivative</h3>
+<p>Same component, but with a typical mistake: <code>0.5 * rho * v</code> instead of <code>rho * v</code>. Save it as <code>d11_wrong.py</code>:</p>
+<py label="the only change, in compute_partials">        partials['q', 'v'] = 0.5 * rho * v       # BUG: should be rho * v</py>
+{{out:d11_wrong.py}}
+<p>How to read the table: <strong>calc val</strong> is <em>your</em> derivative (18.4), <strong>fd val</strong> is OpenMDAO's independent check (36.8; the column is called fd even when the check uses cs), and <strong>error desc</strong> says <code>&gt;TOL</code> when they disagree by more than the tolerance. The row tells you exactly which pair is wrong: <code>q</code> with respect to <code>v</code>.</p>
+
+<h3 id="d11-5"><span class="sec">11.5</span>Which method should you use?</h3>
+<ul>
+  <li><strong>Just getting started, or the formulas are long:</strong> <code>method='cs'</code>. It's accurate with no effort. Make sure the code is complex-safe.</li>
+  <li><strong>The component runs a black box</strong> such as a simulation, a table lookup or another program: <code>method='fd'</code>. That's the only option (Day 14).</li>
+  <li><strong>Speed matters, or the model is big</strong> (Dymos problems with many nodes): analytic, checked with <code>check_partials</code>.</li>
+</ul>
+
+<div class="practice">
+<h3>Practice</h3>
+<ol class="ex">
+  <li><p><strong>Analytic partials for Aero.</strong> With C<sub>L</sub> = C<sub>Lα</sub>·α, L = q·S·C<sub>L</sub> and D = q·S·(C<sub>D0</sub> + k·C<sub>L</sub>²), the partials are:</p>
+    <p>∂L/∂q = S·C<sub>L</sub> &nbsp; ∂L/∂α = q·S·C<sub>Lα</sub> &nbsp; ∂D/∂q = S·(C<sub>D0</sub> + k·C<sub>L</sub>²) &nbsp; ∂D/∂α = q·S·2k·C<sub>L</sub>·C<sub>Lα</sub></p>
+    <p>Write an <code>Aero</code> component with <code>compute_partials</code> and check it with <code>check_partials</code> at q = 3401.25 and α = 0.05. Tip: <code>declare_partials(['L', 'D'], ['q', 'alpha'])</code> declares all four pairs at once.</p>
+    <details><summary>Show solution</summary>{{code:d11_ex1.py}}{{out:d11_ex1.py}}<p>No table printed means all four derivatives are correct.</p></details></li>
+  <li><p><strong>Break it on purpose.</strong> In your exercise 1 solution, delete the <code>2.0 *</code> from <code>partials['D', 'alpha']</code> and run again. Which row does <code>check_partials</code> flag? Then fix it.</p>
+    <details><summary>Show answer</summary><p>Only the row <code>D</code> with respect to <code>alpha</code> is flagged, and your value is half the check value. That ratio is a strong hint that a factor of 2 is missing.</p></details></li>
+  <li><p><strong>Explore the FD step.</strong> In <code>d11_fd_error.py</code>, add <code>1e-6</code> and <code>1e-10</code> to the list of steps. Which FD step size is best? Does that change if you differentiate <code>np.exp(x)</code> at x = 10 instead?</p>
+    <details><summary>Show answer</summary><p>For sin at x = 1, the best FD step is around 1e-8. It's roughly √(machine precision) times the size of x. For exp(10), the numbers are much larger, so the absolute errors grow too. The lesson: FD needs tuning per problem, while CS doesn't. That's why OpenMDAO offers <code>step</code> and <code>step_calc='rel'</code> options for FD (used on Day 14).</p></details></li>
+</ol>
+</div>
+
+<div class="checkpoint">
+<h3>Checkpoint</h3>
+<p>You can now:</p>
+<ul>
+  <li>explain a partial derivative as a slope with respect to one input</li>
+  <li>compare FD, CS and analytic derivatives, and choose between them</li>
+  <li>write <code>declare_partials('out', 'in')</code> and <code>compute_partials</code></li>
+  <li>verify derivatives with <code>check_partials</code> and read its table</li>
+  <li>keep code complex-safe for <code>method='cs'</code></li>
+</ul>
+<label class="done"><input type="checkbox" id="done-11" data-day="11"> I've finished Day 11</label>
+</div>
+</section>

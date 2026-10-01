@@ -1,0 +1,9 @@
+altitude_m,density_kg_m3,temperature_K
+
+h =       0 m   rho = 1.225
+h =    5000 m   rho = 0.68025
+h =   10000 m   rho = 0.37775
+h =   15000 m   rho = 0.20977
+h =   20000 m   rho = 0.11648
+h =   25000 m   rho = 0.06468
+h =   30000 m   rho = 0.03592

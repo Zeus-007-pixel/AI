@@ -1,0 +1,2 @@
+Stall speed at sea level: 25.8 m/s
+Stall speed at 10 km: 46.5 m/s

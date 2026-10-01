@@ -1,0 +1,2 @@
+Heat rate: 0.60 MW/m^2
+Weight: 9810 N

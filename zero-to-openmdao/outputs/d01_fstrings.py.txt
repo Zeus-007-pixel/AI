@@ -1,0 +1,4 @@
+Orbit speed: 7848.432857300987 m/s
+Orbit speed: 7848.4 m/s
+Orbit speed: 7.85 km/s
+Altitude 100 km gives 7848 m/s

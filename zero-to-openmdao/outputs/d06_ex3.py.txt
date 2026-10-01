@@ -1,0 +1,2 @@
+Mach 5.0: CL_alpha = 1.850 per rad
+Mach 7.3: CL_alpha = 1.635 per rad

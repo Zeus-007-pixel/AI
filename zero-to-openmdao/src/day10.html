@@ -1,0 +1,159 @@
+<section class="day" id="day-10">
+<header class="day-head">
+  <p class="eyebrow">Week 2 · Scientific Python and OpenMDAO basics</p>
+  <h2><span class="dn">Day 10</span> Optimization with drivers</h2>
+  <dl class="meta">
+    <dt>Time</dt><dd>3–4 hours</dd>
+    <dt>Goal</dt><dd>Turn a model into an optimization problem, solve it, read the results, scale it, record its history, and know what to check when it fails.</dd>
+  </dl>
+</header>
+
+<div class="warmup">
+  <h3>Warm-up from memory</h3>
+  <ol>
+    <li>How does promotion connect two components?</li>
+    <li>What goes wrong if you add components in the wrong order?</li>
+    <li>What does <code>om.ExecComp('LD = L / D')</code> create?</li>
+  </ol>
+  <details class="answer"><summary>Answers</summary>
+    <p>1. An output and an input promoted to the same name are connected automatically. 2. A component runs before its inputs have been computed and silently uses starting values, giving wrong results with no error. 3. A component with inputs <code>L</code> and <code>D</code> and an output <code>LD</code>, with derivatives handled automatically.</p>
+  </details>
+</div>
+
+<h3 id="d10-1"><span class="sec">10.1</span>From running a model to optimizing it</h3>
+<p>So far you've run models once with values you chose. Optimizing means letting a <strong>driver</strong> choose the values. It runs the model over and over, each time adjusting the design variables to improve the objective while respecting the constraints. You add three kinds of declarations to the model:</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Call</th><th>Declares</th></tr></thead>
+  <tbody>
+    <tr><td><code>add_design_var('x', lower=…, upper=…)</code></td><td>what the optimizer may change, and its bounds</td></tr>
+    <tr><td><code>add_objective('f')</code></td><td>the one output to minimize</td></tr>
+    <tr><td><code>add_constraint('c', lower=…, upper=…, equals=…)</code></td><td>outputs that must stay within limits</td></tr>
+  </tbody>
+</table></div>
+
+<h3 id="d10-2"><span class="sec">10.2</span>The first optimization</h3>
+<p>Day 7's constrained paraboloid, now in OpenMDAO: minimize f subject to x + y ≥ 0. New file <code>d10_optimize.py</code>:</p>
+{{code:d10_optimize.py}}
+{{out:d10_optimize.py}}
+<dl class="lines">
+  <dt><code>p.model.add_subsystem('con', om.ExecComp('c = x + y'), promotes=['*'])</code></dt>
+  <dd>The constraint needs an output to watch, so this tiny component computes c = x + y. Its inputs <code>x</code> and <code>y</code> are promoted, so they're the same <code>x</code> and <code>y</code> the paraboloid uses.</dd>
+  <dt><code>p.model.set_input_defaults('x', 3.0)</code></dt>
+  <dd><code>x</code> is now an input of two components with <em>different</em> starting values (0.0 in <code>Paraboloid</code>, 1.0 in the ExecComp). This says which starting value the shared input gets. See the error box below.</dd>
+  <dt><code>p.driver = om.ScipyOptimizeDriver()</code></dt>
+  <dd>Attach a driver to the problem. This one uses SciPy's optimizers from Day 7.</dd>
+  <dt><code>p.driver.options['optimizer'] = 'SLSQP'</code></dt>
+  <dd>Drivers have options too. Choose SLSQP. <code>'tol'</code> sets how precisely to converge.</dd>
+  <dt><code>p.model.add_design_var('x', lower=-50.0, upper=50.0)</code></dt>
+  <dd>The optimizer may change <code>x</code> between −50 and 50.</dd>
+  <dt><code>p.model.add_objective('f')</code></dt>
+  <dd>Minimize <code>f</code>.</dd>
+  <dt><code>p.model.add_constraint('c', lower=0.0)</code></dt>
+  <dd>Keep <code>c</code> ≥ 0. Use <code>upper=</code> for ≤ and <code>equals=</code> for =.</dd>
+  <dt><code>result = p.run_driver()</code></dt>
+  <dd>Instead of <code>run_model()</code> (one run), <code>run_driver()</code> runs the optimization. SLSQP prints a short report.</dd>
+  <dt><code>result.success</code></dt>
+  <dd><code>True</code> if the optimizer says it converged. Always check it.</dd>
+</dl>
+<p>x = 7, y = −7, f = −27: exactly SciPy's answer from Day 7.</p>
+<aside class="callout warn">
+  <p class="callout-h">Common error: ambiguous promoted inputs</p>
+  <p>Remove the two <code>set_input_defaults</code> lines and <code>p.setup()</code> or <code>run_driver()</code> stops with:</p>
+  {{out:d10_ambiguous.py|tail=14|label=Error}}
+  <p>Read it calmly: two components share the promoted input <code>x</code> but disagree on its starting value. The message even tells you the fix.</p>
+</aside>
+
+<h3 id="d10-3"><span class="sec">10.3</span>Why <code>declare_partials</code> matters: a silent failure</h3>
+<p>Here is the same problem with the <code>declare_partials</code> line deleted from <code>Paraboloid</code>, in <code>d10_no_partials.py</code>:</p>
+<py label="the only change, in Paraboloid.setup">        self.add_output('f', val=0.0)
+        # declare_partials line deliberately missing!</py>
+{{out:d10_no_partials.py}}
+<p>It says <strong><code>Success: True</code>, but the answer is wrong</strong> (f = −14.75 instead of −27). Without declared partials, OpenMDAO assumes f doesn't depend on x or y at all, so the optimizer thinks every direction is flat and stops. OpenMDAO <em>did</em> warn you, in the <code>DerivativesWarning</code> and <code>DriverWarning</code> lines: "objective(s) ['f'] do not depend on any design variables". Two lessons:</p>
+<ol>
+  <li>Every component needs <code>declare_partials</code> (or the alternatives on Day 11).</li>
+  <li><strong>Read warnings.</strong> They are often the only clue to a wrong answer.</li>
+</ol>
+
+<h3 id="d10-4"><span class="sec">10.4</span>An engineering optimization: the slowest level flight</h3>
+<p>Question: how slowly can our glider (500 kg, 10 m² wing) fly at sea level while lift still equals its weight, if the angle of attack must stay below 12°? This uses the <code>FlightCondition</code> group you saved in <code>flight_components.py</code> on Day 9. New file <code>d10_slowest.py</code>:</p>
+{{code:d10_slowest.py}}
+{{out:d10_slowest.py}}
+<dl class="lines">
+  <dt><code>from flight_components import FlightCondition</code></dt>
+  <dd>Reuse your Group from your own module (Day 4).</dd>
+  <dt><code>om.ExecComp('dL = L - m * g', …)</code></dt>
+  <dd>Excess lift. The constraint <code>dL ≥ 0</code> means "lift is at least the weight".</dd>
+  <dt><code>add_design_var('v', lower=5.0, upper=300.0, units='m/s')</code></dt>
+  <dd>Two design variables, <code>v</code> and <code>alpha</code>. You can give bounds in any units: here alpha's bounds are in degrees although the component works in radians.</dd>
+  <dt><code>add_objective('v', ref=10.0)</code></dt>
+  <dd>Minimize speed. <code>ref</code> is <strong>scaling</strong>: "a typical value is about 10". The optimizer sees v/10, so all numbers it handles are around 1.</dd>
+  <dt><code>add_constraint('dL', lower=0.0, ref=1000.0)</code></dt>
+  <dd>Lift ≥ weight, scaled by a typical 1000 N.</dd>
+  <dt><code>p.set_val(…)</code> after <code>setup</code></dt>
+  <dd>The flight conditions and the <strong>starting guess</strong> for the design variables.</dd>
+</dl>
+<p>The answer is 30.92 m/s at exactly 12°. The angle sits on its upper bound: the optimizer pushed it as far as it was allowed, because more angle means more lift, so you can fly slower. Hand check: v = √(2W / (ρ·S·C<sub>L</sub>)) with C<sub>L</sub> = 4 × 0.2094 = 0.838 gives 30.9 m/s. ✓</p>
+<aside class="callout note">
+  <p class="callout-h">Why scaling (<code>ref</code>) matters</p>
+  <p>Optimizers struggle when one number is 30 000 and another is 0.2, because a step that's tiny for one is huge for the other. Setting <code>ref</code> to a typical size of each design variable, objective and constraint makes them all roughly 1 in the optimizer's eyes. When an optimization misbehaves, scaling is the first thing to check.</p>
+</aside>
+
+<h3 id="d10-5"><span class="sec">10.5</span>Maximizing</h3>
+<p>Two equivalent ways to maximize an output: <code>add_objective('LD', scaler=-1.0)</code>, or a negative <code>ref</code> such as <code>add_objective('x', ref=-1e4)</code>. Both flip the sign so the minimizer climbs instead of descends. Exercise 2 uses <code>scaler</code>, and Dymos on Day 15 uses a negative <code>ref</code>.</p>
+
+<h3 id="d10-6"><span class="sec">10.6</span>Recording the optimizer's progress</h3>
+<p>A <strong>recorder</strong> saves the values at every iteration, so you can plot how the optimizer got there. New file <code>d10_recorder.py</code>:</p>
+{{code:d10_recorder.py}}
+{{out:d10_recorder.py}}
+{{img:history.png|The objective falls from 2782 to −27.33 in a few iterations}}
+<dl class="lines">
+  <dt><code>p.driver.add_recorder(om.SqliteRecorder('cases.sql'))</code></dt>
+  <dd>Attach a recorder to the driver. It writes a database file called <code>cases.sql</code>.</dd>
+  <dt><code>om.CaseReader(p.get_outputs_dir() / 'cases.sql')</code></dt>
+  <dd>Opens the recording. OpenMDAO saves it inside the <code>…_out</code> folder. <code>p.get_outputs_dir()</code> gives that folder, and <code>/</code> joins a folder and a file name into a full path.</dd>
+  <dt><code>reader.get_cases('driver')</code></dt>
+  <dd>A list with one entry ("case") per iteration.</dd>
+  <dt><code>case.get_val('f')[0]</code></dt>
+  <dd>The objective's value in that iteration.</dd>
+</dl>
+
+<h3 id="d10-7"><span class="sec">10.7</span>When an optimization fails: a checklist</h3>
+<ol>
+  <li><strong><code>result.success</code> is <code>False</code></strong>, or the message says something like "Iteration limit reached" or "Positive directional derivative for linesearch". Go through the list below.</li>
+  <li><strong>Derivatives:</strong> does every component declare partials? Read every <code>DerivativesWarning</code>.</li>
+  <li><strong>Scaling:</strong> give <code>ref</code> values so everything the optimizer sees is around 1.</li>
+  <li><strong>Starting guess:</strong> start somewhere sensible, not at zero speed or zero density.</li>
+  <li><strong>Bounds:</strong> are they physically sensible? Is the answer sitting on a bound you didn't expect?</li>
+  <li><strong>Is the problem possible?</strong> Constraints that contradict each other can't be met.</li>
+  <li><strong>More iterations:</strong> <code>p.driver.options['maxiter'] = 500</code>.</li>
+</ol>
+
+<div class="practice">
+<h3>Practice</h3>
+<ol class="ex">
+  <li><p><strong>Change the constraint.</strong> In <code>d10_optimize.py</code>, require x + y ≤ −2 instead. What are x, y and f? Is the constraint active (exactly −2)?</p>
+    <details><summary>Show solution</summary>{{code:d10_ex1.py}}{{out:d10_ex1.py|tail=2}}<p>Yes: the unconstrained best has x + y = −0.67, which breaks ≤ −2, so the optimizer pushes right up against the limit.</p></details></li>
+  <li><p><strong>Best glide angle.</strong> Use <code>FlightCondition</code> plus an ExecComp for <code>LD = L / D</code> (with units on <code>L</code> and <code>D</code>!) to find the angle of attack between 0.5° and 20° that maximizes L/D, at sea level and 50 m/s. Compare with Day 6.</p>
+    <details><summary>Show solution</summary>{{code:d10_ex2.py}}{{out:d10_ex2.py|tail=2}}<p>6.41°, the same as Day 6. L/D doesn't depend on speed or altitude in this simple model.</p></details></li>
+  <li><p><strong>Slowest flight at altitude.</strong> Rerun the slowest-flight problem at 0, 5 and 10 km using a <code>for</code> loop around <code>set_val</code> and <code>run_driver</code>. Reset the starting guess each time.</p>
+    <details><summary>Show solution</summary>{{code:d10_ex3.py}}{{out:d10_ex3.py|grep=h =}}</details></li>
+  <li><p><strong>Think it through.</strong> In 10.4, why does the speed get lower as the angle-of-attack bound gets higher? What would happen with no upper bound on alpha in this model, and why is that unrealistic?</p>
+    <details><summary>Show answer</summary><p>Lift = q·S·C<sub>L</sub>, and C<sub>L</sub> grows with alpha in our model, so more alpha lets smaller q (lower speed) produce the same lift. With no bound, alpha would keep growing and the speed keep falling. Real wings <em>stall</em> (C<sub>L</sub> stops growing) at around 12–15°, but our straight-line C<sub>L</sub> = 4α doesn't know that. The model's limits must be enforced by bounds or constraints.</p></details></li>
+</ol>
+</div>
+
+<div class="checkpoint">
+<h3>Checkpoint</h3>
+<p>You can now:</p>
+<ul>
+  <li>attach a <code>ScipyOptimizeDriver</code> and choose SLSQP</li>
+  <li>declare design variables with bounds, an objective, and constraints with <code>lower</code>, <code>upper</code> or <code>equals</code></li>
+  <li>run with <code>run_driver()</code> and check <code>result.success</code></li>
+  <li>explain why missing partials give a silently wrong answer</li>
+  <li>scale with <code>ref</code>, maximize with <code>scaler=-1</code> or a negative <code>ref</code></li>
+  <li>record iterations and read them back with <code>CaseReader</code></li>
+</ul>
+<p>End of week 2. You now know the core of OpenMDAO.</p>
+<label class="done"><input type="checkbox" id="done-10" data-day="10"> I've finished Day 10</label>
+</div>
+</section>

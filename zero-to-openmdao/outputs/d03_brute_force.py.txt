@@ -1,0 +1,2 @@
+Best angle with drag: 41 deg, range 600.9 m
+Without drag, 45 deg gives 1019.5 m

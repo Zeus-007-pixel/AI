@@ -1,0 +1,2 @@
+Testing atmos.py
+1.225 288.15

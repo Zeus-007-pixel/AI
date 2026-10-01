@@ -1,0 +1,1 @@
+Density first drops below 0.01 kg/m^3 at 45 km

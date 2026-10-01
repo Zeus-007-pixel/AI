@@ -1,0 +1,7 @@
+<class 'str'>
+<class 'int'>
+<class 'float'>
+<class 'bool'>
+Vehicle HGV-1
+HGV-1HGV-1HGV-1
+5

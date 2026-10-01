@@ -1,0 +1,8 @@
+500.0
+{'name': 'Glider-1', 'mass': 520.0, 'S': 10.0, 'CD0': 0.02, 'k': 0.1}
+True
+name = Glider-1
+mass = 520.0
+S = 10.0
+CD0 = 0.02
+k = 0.1

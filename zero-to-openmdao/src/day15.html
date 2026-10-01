@@ -1,0 +1,203 @@
+<section class="day" id="day-15">
+<header class="day-head">
+  <p class="eyebrow">Week 3 · Deeper OpenMDAO, then Dymos</p>
+  <h2><span class="dn">Day 15</span> Bridge to Dymos: your first trajectory optimization</h2>
+  <dl class="meta">
+    <dt>Time</dt><dd>3–4 hours</dd>
+    <dt>Goal</dt><dd>Understand how Dymos turns "find the best control history" into an OpenMDAO optimization, run a complete glider trajectory optimization, read every line of it, and know the path to your HGV.</dd>
+  </dl>
+</header>
+
+<div class="warmup">
+  <h3>Warm-up from memory</h3>
+  <ol>
+    <li>Why did the capstone use FD derivatives?</li>
+    <li>What limitation did the capstone hit?</li>
+    <li>What are the inputs and outputs of a Dymos-style ODE component (Day 12)?</li>
+  </ol>
+  <details class="answer"><summary>Answers</summary>
+    <p>1. The component ran <code>solve_ivp</code>, which complex step can't pass through. 2. It could only optimize a single constant α, while a whole α history would need many design variables and become slow and noisy. 3. Inputs are states, controls and parameters, each with <code>num_nodes</code> values. Outputs are the rates of change of the states (plus anything you want to constrain).</p>
+  </details>
+</div>
+
+<h3 id="d15-1"><span class="sec">15.1</span>The idea: draw the whole trajectory, then fix it</h3>
+<p>The capstone simulated forward in time and then adjusted α. Dymos turns this around. It uses a method called <strong>collocation</strong>:</p>
+<ol>
+  <li>Split the flight time into <strong>segments</strong> and place a few points, called <strong>nodes</strong>, in each.</li>
+  <li>Let the optimizer guess the <strong>state and the control at every node, all at once</strong>, as if drawing the whole trajectory freehand.</li>
+  <li>At every node, Dymos runs your ODE component (vectorized over all nodes, Day 12) to get the rates the physics demands. It compares them with the slope of the drawn curve. The mismatch is called a <strong>defect</strong>.</li>
+  <li>The defects become <strong>equality constraints</strong> (they must be 0). The optimizer adjusts the drawing until the physics is satisfied everywhere <em>and</em> the objective is as good as possible.</li>
+</ol>
+<div class="diagram"> h
+ │  o──o──o                    o = node: the optimizer's guess of the state there
+ │          \
+ │           o──o              at every node:   slope of the drawn curve
+ │                \                      vs.    rate computed by your ODE
+ │                 o──o                  difference = "defect" → must become 0
+ └──────────────────────── t</div>
+<p>There's no simulation inside the optimization loop, the derivatives are exact and sparse (Days 11 and 12), and the control can take a different value at every node. That's what makes it fast and reliable for problems like your HGV.</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Dymos concept</th><th>What it becomes in OpenMDAO terms</th></tr></thead>
+  <tbody>
+    <tr><td>State values at the nodes</td><td>design variables</td></tr>
+    <tr><td>Control values at the nodes</td><td>design variables</td></tr>
+    <tr><td>Flight duration (if free)</td><td>a design variable</td></tr>
+    <tr><td>Defects (physics must hold)</td><td>equality constraints</td></tr>
+    <tr><td>Your ODE class</td><td>a vectorized <code>ExplicitComponent</code> with <code>num_nodes</code></td></tr>
+    <tr><td>Phase</td><td>a Group that Dymos builds for you</td></tr>
+    <tr><td>Trajectory</td><td>a Group holding one or more phases</td></tr>
+  </tbody>
+</table></div>
+
+<h3 id="d15-2"><span class="sec">15.2</span>The complete program</h3>
+<p>New file <code>d15_glider.py</code>. It's the longest file of the course, but you know every Python and OpenMDAO piece in it. Type it carefully:</p>
+{{code:d15_glider.py}}
+{{out:d15_glider.py|grep=Optimization terminated|Iterations|Optimization Complete|Simulating|Done simulating|flight time|alpha between}}
+<p>(The real output is longer. Dymos and OpenMDAO also print coloring reports and one harmless warning about the constraint on <code>q</code> at the first node, which can't change because the starting state is fixed.)</p>
+
+<h4>Block 1: the ODE (lines 8–52)</h4>
+<p>Exactly the <code>GliderODE</code> you ran by itself on Day 12. Dymos creates it with the right <code>num_nodes</code> and connects states, controls and parameters to the inputs with <strong>the same names</strong>.</p>
+
+<h4>Block 2: problem and optimizer (lines 56–58)</h4>
+<dl class="lines">
+  <dt><code>p.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', maxiter=300)</code></dt>
+  <dd>The same driver as Day 10, allowed up to 300 iterations.</dd>
+  <dt><code>p.driver.declare_coloring()</code></dt>
+  <dd>Day 12's sparsity idea, applied to the whole problem. This problem has hundreds of design variables and constraints, and coloring makes their derivatives cheap.</dd>
+</dl>
+
+<h4>Block 3: trajectory, phase and transcription (lines 61–63)</h4>
+<dl class="lines">
+  <dt><code>traj = p.model.add_subsystem('traj', dm.Trajectory())</code></dt>
+  <dd>A Trajectory is a Group that holds phases. Add it to the model like any subsystem.</dd>
+  <dt><code>dm.Radau(num_segments=15, order=3)</code></dt>
+  <dd>The <strong>transcription</strong>: how time is chopped up. 15 segments of order 3 (a few nodes each). More segments means more accuracy but a bigger problem. Radau is a good default.</dd>
+  <dt><code>traj.add_phase('glide', dm.Phase(ode_class=GliderODE, transcription=…))</code></dt>
+  <dd>A <strong>phase</strong> is one stretch of flight with one ODE. Note <code>ode_class=GliderODE</code> with <em>no</em> brackets: you give Dymos the class (the blueprint, Day 5), and Dymos creates the objects itself. Multi-stage flights, such as boost then glide, use several phases.</dd>
+</dl>
+
+<h4>Block 4: time (line 66)</h4>
+<dl class="lines">
+  <dt><code>phase.set_time_options(fix_initial=True, duration_bounds=(10, 5000), duration_ref=100, units='s')</code></dt>
+  <dd>The start time is fixed. The <strong>duration is free</strong>, so the optimizer decides how long the flight lasts, between 10 and 5000 s. <code>duration_ref</code> is scaling, as on Day 10.</dd>
+</dl>
+
+<h4>Block 5: states (lines 69–73)</h4>
+<dl class="lines">
+  <dt><code>phase.add_state('h', rate_source='h_dot', units='m', fix_initial=True, lower=0, ref=1e3)</code></dt>
+  <dd>The state's name must match the ODE input's name (<code>'h'</code>). <code>rate_source</code> names the ODE output holding its rate. <code>fix_initial=True</code> pins the starting value to your initial guess (Block 9). <code>lower=0</code> keeps the glider above ground at every node. <code>ref</code> is scaling.</dd>
+  <dt><code>'x'</code> isn't an ODE input</dt>
+  <dd>That's fine. Nothing in the physics depends on downrange distance. Dymos still integrates it from <code>x_dot</code>.</dd>
+</dl>
+
+<h4>Block 6: the control (line 76)</h4>
+<dl class="lines">
+  <dt><code>phase.add_control('alpha', units='deg', lower=-5, upper=15, rate_continuity=True)</code></dt>
+  <dd>α becomes a <em>history</em>: a value at every node, chosen by the optimizer. You may work in degrees; Dymos converts to radians for the ODE (Day 8 units). <code>rate_continuity=True</code> keeps the history smooth between segments.</dd>
+</dl>
+
+<h4>Block 7: parameters (lines 79–80)</h4>
+<dl class="lines">
+  <dt><code>phase.add_parameter('m', units='kg', val=500.0, opt=False)</code></dt>
+  <dd>Fixed numbers sent to the ODE at every node. <code>opt=True</code> would let the optimizer choose it, turning this into vehicle design plus trajectory optimization at once.</dd>
+</dl>
+
+<h4>Block 8: constraints, objective and extra outputs (lines 83–91)</h4>
+<dl class="lines">
+  <dt><code>phase.add_boundary_constraint('h', loc='final', equals=0.0, units='m')</code></dt>
+  <dd>A <strong>boundary</strong> constraint applies at one end of the phase (<code>'initial'</code> or <code>'final'</code>). Here: end on the ground.</dd>
+  <dt><code>phase.add_path_constraint('q', upper=20000.0, units='Pa', ref=1e4)</code></dt>
+  <dd>A <strong>path</strong> constraint applies at <em>every</em> node. For your HGV, this is where heat-rate, dynamic-pressure and g-load limits go. It can constrain any ODE output, which is why the ODE outputs <code>q</code>.</dd>
+  <dt><code>phase.add_path_constraint('alpha', upper=15.0, units='deg')</code></dt>
+  <dd>See "Good to know" in 15.4.</dd>
+  <dt><code>phase.add_objective('x', loc='final', ref=-1e4)</code></dt>
+  <dd>Maximize final downrange (negative <code>ref</code>, Day 10).</dd>
+  <dt><code>phase.add_timeseries_output('q')</code></dt>
+  <dd>Also record <code>q</code> in the results.</dd>
+</dl>
+
+<h4>Block 9: initial guess (lines 96–101), after <code>p.setup()</code></h4>
+<dl class="lines">
+  <dt><code>phase.set_time_val(initial=0.0, duration=600.0)</code></dt>
+  <dd>Start at t = 0 and guess a 600 s flight. The optimizer will change the duration.</dd>
+  <dt><code>phase.set_state_val('h', [5000.0, 0.0])</code></dt>
+  <dd>A guess as a straight line from the first value to the second, spread over all nodes. Because of <code>fix_initial=True</code>, <strong>the first value is the real starting condition</strong>: released at 5000 m.</dd>
+  <dt><code>phase.set_control_val('alpha', [3.0, 3.0], units='deg')</code></dt>
+  <dd>Guess a constant 3° to start. A sensible guess matters a lot: starting from zeros (speed 0!) would make the physics divide by zero.</dd>
+</dl>
+
+<h4>Block 10: run (line 104)</h4>
+<dl class="lines">
+  <dt><code>dm.run_problem(p, simulate=True, make_plots=True)</code></dt>
+  <dd>Runs the optimization (like <code>run_driver</code>). <code>simulate=True</code> then <strong>re-flies</strong> the result with an ordinary step-by-step integrator (like Day 7) using the optimal control, to confirm the answer obeys the physics between nodes too. <code>make_plots=True</code> saves plots of every variable to <code>d15_glider_out/reports/traj_results_report.html</code>.</dd>
+</dl>
+
+<h4>Blocks 11–12: results and plots (lines 107–130)</h4>
+<dl class="lines">
+  <dt><code>p.get_val('traj.glide.timeseries.x', units='km')</code></dt>
+  <dd>The <strong>timeseries</strong> holds every state, control and extra output at every node, by full path: trajectory name, phase name, <code>timeseries</code>, variable.</dd>
+  <dt><code>t[-1, 0]</code></dt>
+  <dd>Timeseries values are 2D arrays with one row per node and one column (Day 6). <code>[-1, 0]</code> is the last row, which is the end of the flight.</dd>
+  <dt>The two <code>plt.figure()</code> blocks</dt>
+  <dd>Day 7 plotting. <code>plt.figure()</code> starts a new, separate figure.</dd>
+</dl>
+{{img:glide_path.png|The optimal glide path}}
+{{img:glide_alpha.png|The optimal angle-of-attack history}}
+
+<h3 id="d15-3"><span class="sec">15.3</span>Reading the answer like an engineer</h3>
+<ul>
+  <li><strong>Range: 60.35 km</strong>, against 58.89 km for the best <em>constant</em> α on Day 14. Letting α vary over time buys about 1.5 km.</li>
+  <li>For most of the flight <strong>α sits at about 6.4°</strong>, the best-L/D angle you found on Days 6 and 10. Dymos rediscovered it on its own.</li>
+  <li>At the <strong>start</strong>, α is low: the glider trades its extra speed for distance before settling into the efficient glide.</li>
+  <li>At the <strong>end</strong>, α rises sharply: a final flare that turns the remaining speed into a little extra distance just before touching down.</li>
+</ul>
+<p>Physics you can explain is the best evidence an optimization is right. Always look for it.</p>
+
+<h3 id="d15-4"><span class="sec">15.4</span>Good to know before you go further</h3>
+<aside class="callout warn">
+  <p class="callout-h">Control bounds at segment ends</p>
+  <p>With the Radau transcription, the control's <code>lower</code>/<code>upper</code> bounds are enforced where the control is a design variable. The value at the very end of each segment is <em>extrapolated</em> and can slip past the bound. While writing this course, a heavier glider showed α = 19.2° at the final node despite <code>upper=15</code>. The fix is a path constraint on the control, which checks every node: <code>phase.add_path_constraint('alpha', upper=15.0, units='deg')</code>.</p>
+</aside>
+<ul>
+  <li><strong>Check <code>simulate=True</code>.</strong> In the HTML report the simulated curves should lie on top of the optimized points. If they drift apart, use more segments.</li>
+  <li><strong>Scaling and guesses</strong> matter even more than on Day 10. Give every state a <code>ref</code>, and guess a trajectory that's at least roughly physical.</li>
+  <li><strong>Bigger problems</strong> (your 6-state HGV) are much happier with the IPOPT optimizer than SLSQP. It comes with <code>pyoptsparse</code>, which is easiest to install with conda (<code>conda install -c conda-forge pyoptsparse</code>). Then use <code>p.driver = om.pyOptSparseDriver(optimizer='IPOPT')</code>.</li>
+</ul>
+
+<h3 id="d15-5"><span class="sec">15.5</span>From this glider to your HGV</h3>
+<ol>
+  <li><strong>Swap the ODE.</strong> Use your <code>HGV_ODE</code>, with 6 states (r, θ, φ, v, γ, ψ) and 2 controls (α, σ). Add one <code>add_state</code> per state and one <code>add_control</code> per control. Replace <code>declare_partials('*', '*', method='cs')</code> with <code>declare_coloring(wrt='*', method='cs')</code> (Day 12).</li>
+  <li><strong>Real atmosphere.</strong> Dymos ships a US 1976 standard atmosphere component: <code>from dymos.models.atmosphere import USatm1976Comp</code>. Put it in a Group with your ODE (Day 9), or use <code>np.interp</code> on a table (Day 6).</li>
+  <li><strong>Real aerodynamics.</strong> Compute L and D from ρ, v, S and C<sub>L</sub>/C<sub>D</sub> tables in α and Mach, so α finally matters.</li>
+  <li><strong>Limits as path constraints:</strong> heat rate (the Sutton–Graves formula from Day 5), dynamic pressure and load factor (Day 12), all as ODE outputs.</li>
+  <li><strong>The footprint.</strong> Solve the same problem several times with different objectives: maximize final θ (downrange), minimize it, and maximize ±φ (crossrange). Each solution becomes the initial guess for the next.</li>
+  <li><strong>Study the official example.</strong> Dymos includes a Space Shuttle reentry problem with the same kind of physics, in <code>dymos/examples/shuttle_reentry</code> in your installed package, and in the online Dymos documentation.</li>
+</ol>
+
+<div class="practice">
+<h3>Practice</h3>
+<ol class="ex">
+  <li><p><strong>A heavier glider.</strong> Change the mass parameter to 1000 kg. Predict first: what happens to the range and the flight time? (Remember Day 14, exercise 3.)</p>
+    <details><summary>Show solution</summary><py label="the only change">phase.add_parameter('m', units='kg', val=1000.0, opt=False)</py>{{out:d15_ex1.py|grep=flight time|alpha between}}<p>Nearly the same range but a shorter, faster flight, just like the constant-α capstone. The α path constraint is doing its job here: without it the final node showed 19.2°.</p></details></li>
+  <li><p><strong>Stay up as long as possible.</strong> Change the objective to maximize the flight <em>time</em> instead of the distance: <code>phase.add_objective('time', loc='final', ref=-100.0)</code>. How do the range and duration change, and why?</p>
+    <details><summary>Show solution</summary>{{out:d15_ex2.py|grep=flight time|alpha between}}<p>About 163 s longer in the air but 7.7 km shorter. The best endurance comes from minimizing the <em>sink rate</em>, which happens at a higher α and slower speed than the best glide <em>ratio</em>. Same aircraft, different objective, different optimal control.</p></details></li>
+  <li><p><strong>Start higher.</strong> Release the glider at 10 km instead of 5 km (change the <code>h</code> initial guess to <code>[10000.0, 0.0]</code>, and the <code>x</code> guess to <code>[0.0, 100000.0]</code>). Predict the range before running.</p>
+    <details><summary>Show solution</summary>{{out:d15_ex3.py|grep=flight time|alpha between}}<p>About 117 km, roughly double, as L/D × height predicts. It's slightly less than double because the starting speed's energy is the same in both cases.</p></details></li>
+  <li><p><strong>Your own next step.</strong> Copy <code>d15_glider.py</code> to <code>hgv_first.py</code> and replace <code>GliderODE</code> with your <code>HGV_ODE</code>. Start with fixed lift and drag (as in your original code), only 10 segments, and only the bank angle σ as a control. Getting this to converge, even with simple physics, is your graduation exercise. Bring the error messages to the chat if you get stuck.</p></li>
+</ol>
+</div>
+
+<div class="checkpoint">
+<h3>Checkpoint: course complete</h3>
+<p>You can now:</p>
+<ul>
+  <li>explain collocation: nodes, defects, and why it beats simulate-and-adjust</li>
+  <li>set up a Trajectory, Phase and transcription with states, controls, parameters, boundary and path constraints, and an objective</li>
+  <li>give an initial guess, run with <code>dm.run_problem</code>, verify with <code>simulate=True</code>, and read the timeseries</li>
+  <li>interpret an optimal control history physically</li>
+  <li>list the steps from this glider to your hypersonic vehicle</li>
+</ul>
+<p>Fifteen days ago you hadn't written a line of code. Keep going: rebuild one exercise from memory each week, and start the HGV step by step.</p>
+<label class="done"><input type="checkbox" id="done-15" data-day="15"> I've finished Day 15</label>
+</div>
+</section>

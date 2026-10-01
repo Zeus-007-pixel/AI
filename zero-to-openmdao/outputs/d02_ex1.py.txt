@@ -1,0 +1,4 @@
+Mach 0.5: subsonic
+Mach 0.95: transonic
+Mach 2.0: supersonic
+Mach 7.5: hypersonic

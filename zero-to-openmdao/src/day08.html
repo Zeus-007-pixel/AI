@@ -1,0 +1,154 @@
+<section class="day" id="day-8">
+<header class="day-head">
+  <p class="eyebrow">Week 2 · Scientific Python and OpenMDAO basics</p>
+  <h2><span class="dn">Day 8</span> Your first OpenMDAO component</h2>
+  <dl class="meta">
+    <dt>Time</dt><dd>3–4 hours</dd>
+    <dt>Goal</dt><dd>Understand OpenMDAO's building blocks, write components, run them in a Problem, and use units and options.</dd>
+  </dl>
+</header>
+
+<div class="warmup">
+  <h3>Warm-up from memory</h3>
+  <ol>
+    <li>In a <code>solve_ivp</code> result, what is <code>sol.y[1]</code>?</li>
+    <li>How do you maximize something with an optimizer that only minimizes?</li>
+    <li>What's the difference between a design variable and a constraint?</li>
+  </ol>
+  <details class="answer"><summary>Answers</summary>
+    <p>1. The second state variable (row 1) at every time step. 2. Minimize its negative. 3. A design variable is something the optimizer may change. A constraint is a condition on a result that must be satisfied.</p>
+  </details>
+</div>
+
+<h3 id="d8-1"><span class="sec">8.1</span>What OpenMDAO is, in plain words</h3>
+<p>OpenMDAO is NASA's framework for building engineering models from blocks and optimizing them. ("MDAO" means multidisciplinary design, analysis and optimization.) SciPy can optimize one function. OpenMDAO lets you build a big model from many small pieces, such as atmosphere, aerodynamics, propulsion and trajectory. It connects them, converts units, and works out the derivatives the optimizer needs efficiently. Dymos is built on top of it.</p>
+<p>Five words cover the whole framework:</p>
+<div class="diagram">Problem                    the whole job: model + driver
+├── driver                 what runs the model, e.g. an optimizer (Day 10)
+└── model                  the top Group, holding everything
+    ├── Component          one calculation block: inputs → outputs
+    └── Group              a container of components (and other groups) (Day 9)
+        ├── Component
+        └── Component</div>
+<div class="table-wrap"><table>
+  <thead><tr><th>Word</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Component</strong></td><td>One calculation. You write it as a class with <code>setup</code> and <code>compute</code>, exactly like Day 5's <code>MiniComponent</code>.</td></tr>
+    <tr><td><strong>Group</strong></td><td>A box that holds components and wires them together.</td></tr>
+    <tr><td><strong>model</strong></td><td>The top-level Group. Every Problem has one, called <code>p.model</code>.</td></tr>
+    <tr><td><strong>Driver</strong></td><td>Something that runs the model repeatedly, usually an optimizer.</td></tr>
+    <tr><td><strong>Problem</strong></td><td>The object that owns all of the above. You create it, set it up, and run it.</td></tr>
+  </tbody>
+</table></div>
+
+<h3 id="d8-2"><span class="sec">8.2</span>The first component, line by line</h3>
+<p>The same paraboloid as Day 7: f(x, y) = (x−3)² + xy + (y+4)² − 3. New file <code>d08_paraboloid.py</code>:</p>
+{{code:d08_paraboloid.py}}
+{{out:d08_paraboloid.py}}
+<p><strong>Part 1: the component class</strong></p>
+<dl class="lines">
+  <dt><code>import openmdao.api as om</code></dt>
+  <dd>Everything you need from OpenMDAO is in <code>openmdao.api</code>, nicknamed <code>om</code>.</dd>
+  <dt><code>class Paraboloid(om.ExplicitComponent):</code></dt>
+  <dd>Your component inherits from OpenMDAO's <code>ExplicitComponent</code>. "Explicit" means the outputs can be computed directly from the inputs with formulas. (Day 13 shows the other kind.)</dd>
+  <dt><code>def setup(self):</code></dt>
+  <dd>OpenMDAO calls this when the problem is set up. You declare your variables here.</dd>
+  <dt><code>self.add_input('x', val=0.0)</code></dt>
+  <dd>Declares an input called <code>'x'</code> with starting value 0.0. <code>add_input</code> is a method inherited from <code>ExplicitComponent</code>, which is why it's called through <code>self</code>.</dd>
+  <dt><code>self.add_output('f', val=0.0)</code></dt>
+  <dd>Declares an output. Outputs are what <code>compute</code> must fill in.</dd>
+  <dt><code>self.declare_partials('*', '*', method='cs')</code></dt>
+  <dd>Tells OpenMDAO how to get <strong>derivatives</strong>, which optimizers need (Day 10). <code>'*', '*'</code> means "every output with respect to every input", and <code>method='cs'</code> means "work them out automatically with complex step". Day 11 explains this fully. For now, <strong>always include this line</strong>. Day 10 shows what goes wrong without it.</dd>
+  <dt><code>def compute(self, inputs, outputs):</code></dt>
+  <dd>OpenMDAO calls this every time the model runs. <code>inputs</code> and <code>outputs</code> work like dictionaries.</dd>
+  <dt><code>x = inputs['x']</code></dt>
+  <dd>Read an input by its name.</dd>
+  <dt><code>outputs['f'] = (x - 3.0)**2 + …</code></dt>
+  <dd>Calculate and store the output by name.</dd>
+</dl>
+<p><strong>Part 2: the problem that runs it</strong></p>
+<dl class="lines">
+  <dt><code>p = om.Problem()</code></dt>
+  <dd>Create an empty Problem. It comes with an empty model, <code>p.model</code>.</dd>
+  <dt><code>p.model.add_subsystem('parab', Paraboloid(), promotes=['*'])</code></dt>
+  <dd>Put a component in the model. <code>'parab'</code> is the name <em>you</em> give this copy. <code>Paraboloid()</code> creates the object (note the brackets). <code>promotes=['*']</code> lets you refer to its variables by short names like <code>'x'</code> instead of <code>'parab.x'</code>. Section 8.5 shows the alternative.</dd>
+  <dt><code>p.setup()</code></dt>
+  <dd>OpenMDAO builds everything. This is when your <code>setup</code> method runs. Always call it after adding components and before setting values.</dd>
+  <dt><code>p.set_val('x', 3.0)</code></dt>
+  <dd>Give an input a value.</dd>
+  <dt><code>p.run_model()</code></dt>
+  <dd>Run the model once. OpenMDAO calls your <code>compute</code>.</dd>
+  <dt><code>p.get_val('f')</code></dt>
+  <dd>Read a result. It prints <code>[-15.]</code> with square brackets, because <strong>OpenMDAO always stores values as NumPy arrays</strong>, even single numbers (an array with one element). Use <code>p.get_val('f')[0]</code> to get the plain number.</dd>
+</dl>
+<p>Check by hand: f(3, −4) = 0 + (−12) + 0 − 3 = −15. Correct.</p>
+<aside class="callout note">
+  <p class="callout-h">Things you'll notice</p>
+  <p><strong>A new folder</strong> such as <code>d08_paraboloid_out</code> appears next to your file each time you run. OpenMDAO saves reports there. It's harmless and you can delete it any time.</p>
+  <p><strong>Warning lines</strong> containing the word <code>Warning</code> may appear when OpenMDAO starts. A warning is not an error: the program still ran. Read warnings, because they sometimes point to real problems (Day 10 shows one), but they don't stop anything.</p>
+</aside>
+
+<h3 id="d8-3"><span class="sec">8.3</span>Units: let OpenMDAO convert for you</h3>
+<p>Units bugs are the most common engineering bug (remember Day 4). OpenMDAO tracks units for you. New file <code>d08_units.py</code>:</p>
+{{code:d08_units.py}}
+{{out:d08_units.py}}
+<dl class="lines">
+  <dt><code>self.add_input('rho', val=1.225, units='kg/m**3')</code></dt>
+  <dd>Each variable can declare its units. Write powers with <code>**</code>.</dd>
+  <dt><code>p.set_val('v', 7200.0, units='km/h')</code></dt>
+  <dd>You give the value in km/h. OpenMDAO converts it to the component's units (m/s) before <code>compute</code> sees it. So your <code>compute</code> code can trust its units.</dd>
+  <dt><code>p.get_val('q', units='kPa')</code></dt>
+  <dd>Ask for the result in any compatible unit.</dd>
+</dl>
+<p>Common unit strings: <code>m</code>, <code>km</code>, <code>ft</code>, <code>s</code>, <code>kg</code>, <code>N</code>, <code>kN</code>, <code>Pa</code>, <code>kPa</code>, <code>deg</code>, <code>rad</code>, <code>m/s</code>, <code>km/h</code>, <code>m/s**2</code>, <code>m**2</code>, <code>kg/m**3</code>, <code>W/m**2</code>. Asking for incompatible units, such as a length in seconds, gives a clear error.</p>
+
+<h3 id="d8-4"><span class="sec">8.4</span>Options: settings chosen when you build the model</h3>
+<p>Some numbers are not inputs that change during a run. They're fixed settings, like a reference area or the number of points to compute. Those are <strong>options</strong>. New file <code>d08_options.py</code>:</p>
+{{code:d08_options.py}}
+{{out:d08_options.py}}
+<dl class="lines">
+  <dt><code>def initialize(self):</code></dt>
+  <dd>A third method OpenMDAO calls, the <em>first</em> one, when the component object is created. Declare options here.</dd>
+  <dt><code>self.options.declare('S', default=10.0, desc='…')</code></dt>
+  <dd>Declares an option named <code>'S'</code> with a default value and a description.</dd>
+  <dt><code>S = self.options['S']</code></dt>
+  <dd>Read an option inside <code>compute</code> (or <code>setup</code>).</dd>
+  <dt><code>Lift(S=20.0)</code></dt>
+  <dd>Set the option when you create the component, as a keyword argument.</dd>
+  <dt><code>p.model.list_outputs()</code></dt>
+  <dd>Prints a table of every output in the model: useful for checking everything at once.</dd>
+</dl>
+<p>Inputs are values the model, or an optimizer, can change between runs. Options are fixed when you build the model. The HGV code's <code>num_nodes</code> is an option.</p>
+
+<h3 id="d8-5"><span class="sec">8.5</span>Without <code>promotes</code>: full path names</h3>
+<p>If you leave out <code>promotes</code>, every variable is known by its full <strong>path</strong>: <code>component_name.variable_name</code>. New file <code>d08_paths.py</code>:</p>
+{{code:d08_paths.py}}
+{{out:d08_paths.py}}
+<p>Notice <code>'parab.x'</code> instead of <code>'x'</code>. Both styles are common. Promoting gives shorter names; full paths make it obvious where a variable lives. Dymos uses paths like <code>'traj.glide.timeseries.x'</code>.</p>
+
+<div class="practice">
+<h3>Practice</h3>
+<ol class="ex">
+  <li><p><strong>Atmosphere component.</strong> Write an <code>Atmosphere</code> component: input <code>h</code> (m), output <code>rho</code> (kg/m**3) = 1.225·e^(−h/8500). Run it at 8500 m; you should get 1.225/e ≈ 0.4507. Then set <code>h</code> to 30 in km.</p>
+    <details><summary>Show solution</summary>{{code:d08_ex1.py}}{{out:d08_ex1.py}}<p>Inside <code>compute</code> use <code>np.exp</code>, not <code>math.exp</code>, because inputs are arrays.</p></details></li>
+  <li><p><strong>Weight with an option.</strong> Write a <code>Weight</code> component with an option <code>g</code> (default 9.81), input <code>m</code> (kg) and output <code>W</code> (N). Add two copies to one model, <code>'earth'</code> and <code>'moon'</code> (with g = 1.62), set both masses to 1000 kg, and print both weights. Also print the Earth weight in kN.</p>
+    <details><summary>Show solution</summary>{{code:d08_ex2.py}}{{out:d08_ex2.py}}</details></li>
+  <li><p><strong>Unit conversions.</strong> Using the <code>DynamicPressure</code> component, compute q at ρ = 0.0184 kg/m³ and v = 2000 m/s, and print it in Pa, kPa, psi and atm.</p>
+    <details><summary>Show solution</summary>{{code:d08_ex3.py}}{{out:d08_ex3.py}}</details></li>
+</ol>
+</div>
+
+<div class="checkpoint">
+<h3>Checkpoint</h3>
+<p>You can now:</p>
+<ul>
+  <li>explain Problem, model, Component, Group and driver</li>
+  <li>write an <code>ExplicitComponent</code> with <code>setup</code> (inputs, outputs, <code>declare_partials</code>) and <code>compute</code></li>
+  <li>run it: <code>add_subsystem</code> → <code>setup</code> → <code>set_val</code> → <code>run_model</code> → <code>get_val</code></li>
+  <li>explain why <code>get_val</code> returns an array, and use <code>[0]</code></li>
+  <li>declare units and convert with <code>set_val(..., units=...)</code> and <code>get_val(..., units=...)</code></li>
+  <li>use options with <code>initialize</code> and <code>self.options.declare</code></li>
+</ul>
+<label class="done"><input type="checkbox" id="done-8" data-day="8"> I've finished Day 8</label>
+</div>
+</section>

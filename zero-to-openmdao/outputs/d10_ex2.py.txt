@@ -1,0 +1,9 @@
+Optimization terminated successfully    (Exit mode 0)
+            Current function value: -11.180339887454078
+            Iterations: 7
+            Function evaluations: 7
+            Gradient evaluations: 7
+Optimization Complete
+-----------------------------------
+Best alpha: 6.41 deg
+Best L/D:   11.180

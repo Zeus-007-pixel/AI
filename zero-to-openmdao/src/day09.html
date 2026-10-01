@@ -1,0 +1,118 @@
+<section class="day" id="day-9">
+<header class="day-head">
+  <p class="eyebrow">Week 2 · Scientific Python and OpenMDAO basics</p>
+  <h2><span class="dn">Day 9</span> Groups and connections</h2>
+  <dl class="meta">
+    <dt>Time</dt><dd>3–4 hours</dd>
+    <dt>Goal</dt><dd>Build a model from several components, connect them by promotion or by <code>connect</code>, use quick equation components, and read the N2 diagram.</dd>
+  </dl>
+</header>
+
+<div class="warmup">
+  <h3>Warm-up from memory</h3>
+  <ol>
+    <li>In OpenMDAO, who calls <code>compute</code>, and when?</li>
+    <li>Why does <code>p.get_val('f')</code> print <code>[-15.]</code> instead of <code>-15</code>?</li>
+    <li>What's the difference between an option and an input?</li>
+  </ol>
+  <details class="answer"><summary>Answers</summary>
+    <p>1. OpenMDAO does, every time the model runs, for example on <code>p.run_model()</code>. 2. OpenMDAO stores every value as a NumPy array, so a single number is an array with one element. 3. An option is a fixed setting chosen when you build the model. An input is a value that can change between runs.</p>
+  </details>
+</div>
+
+<h3 id="d9-1"><span class="sec">9.1</span>A model made of several blocks</h3>
+<p>Real models are chains of calculations. To get lift and drag from altitude and speed:</p>
+<div class="diagram">  h ──► [ Atmosphere ] ──rho──► [ DynamicPressure ] ──q──► [ Aero ] ──► L, D
+                                        ▲                      ▲
+                                        v                    alpha</div>
+<p>Each box is a component. An output of one box becomes an input of the next, and that link is a <strong>connection</strong>. A <strong>Group</strong> holds the boxes and their connections.</p>
+
+<h3 id="d9-2"><span class="sec">9.2</span>Groups and promotion</h3>
+<p>New file <code>d09_group.py</code>. It's long, but every component follows the Day 8 pattern:</p>
+{{code:d09_group.py}}
+{{out:d09_group.py}}
+<dl class="lines">
+  <dt>The three component classes</dt>
+  <dd>Nothing new: inputs, outputs with units, <code>declare_partials</code>, <code>compute</code>. <code>Aero</code> uses four options for its fixed aerodynamic constants.</dd>
+  <dt><code>class FlightCondition(om.Group):</code></dt>
+  <dd>Your own Group class, which inherits from <code>om.Group</code>.</dd>
+  <dt><code>def setup(self):</code> inside the group</dt>
+  <dd>For a Group, <code>setup</code> adds the subsystems (the parts) instead of variables.</dd>
+  <dt><code>self.add_subsystem('atmos', Atmosphere(), promotes=['*'])</code></dt>
+  <dd>Adds a component to <em>this group</em>. <code>promotes=['*']</code> lifts all its variables up to the group level, using their short names.</dd>
+  <dt>The key rule of promotion</dt>
+  <dd><strong>When an output and an input are promoted to the same name, OpenMDAO connects them automatically.</strong> <code>atmos</code> outputs <code>rho</code> and <code>dynp</code> has an input <code>rho</code>, so they're connected. Likewise <code>q</code> links <code>dynp</code> to <code>aero</code>.</dd>
+  <dt><code>p.model.add_subsystem('flight', FlightCondition(), promotes=['*'])</code></dt>
+  <dd>A Group goes into the model exactly like a component. Groups can hold groups, as deep as you like.</dd>
+  <dt><code>p.set_val('h', 5000.0)</code></dt>
+  <dd><code>h</code>, <code>v</code> and <code>alpha</code> are inputs that no output feeds. OpenMDAO quietly creates a hidden source for each unconnected input (called "auto IVC"), so you can set them with <code>set_val</code>.</dd>
+</dl>
+<p>Sanity check: at 5 km, ρ = 0.6803 kg/m³, so q = ½ · 0.6803 · 100² = 3401 Pa. ✓</p>
+<p><strong>Save these blocks for later.</strong> Make a new file <code>flight_components.py</code> and copy into it everything in <code>d09_group.py</code> <em>above</em> the line <code>p = om.Problem()</code>: the imports, the three components and <code>FlightCondition</code>. From now on any file can write <code>from flight_components import FlightCondition</code> (Day 4 modules).</p>
+<details><summary>Show flight_components.py</summary>{{code:flight_components.py}}</details>
+
+<h3 id="d9-3"><span class="sec">9.3</span>Connecting by hand with <code>connect</code></h3>
+<p>Instead of promoting, you can wire outputs to inputs explicitly using full paths. New file <code>d09_connect.py</code>:</p>
+{{code:d09_connect.py}}
+{{out:d09_connect.py}}
+<p><code>model.connect('atmos.rho', 'dynp.rho')</code> means "feed output <code>rho</code> of <code>atmos</code> into input <code>rho</code> of <code>dynp</code>". The order is always <strong>output first, then input</strong>. Use <code>connect</code> when names don't match, or when you want every link to be visible in the code.</p>
+
+<h3 id="d9-4"><span class="sec">9.4</span>Order matters</h3>
+<p>By default OpenMDAO runs the subsystems of a group <strong>once, in the order you added them</strong>. Here is <code>d09_group.py</code> with the first two components swapped, saved as <code>d09_wrong_order.py</code>:</p>
+<py label="the only change, in FlightCondition.setup">        self.add_subsystem('dynp', DynamicPressure(), promotes=['*'])   # WRONG ORDER
+        self.add_subsystem('atmos', Atmosphere(), promotes=['*'])</py>
+{{out:d09_wrong_order.py}}
+<p>No error, but q is wrong: 6125 Pa instead of 3401. <code>dynp</code> ran before <code>atmos</code> had computed the density, so it used <code>rho</code>'s starting value of 1.225. <strong>Add components in the order the data flows.</strong> (Groups also have an <code>auto_order</code> option that sorts them for you, but the simple habit is safer.)</p>
+
+<h3 id="d9-5"><span class="sec">9.5</span>Quick equations with <code>ExecComp</code></h3>
+<p>Writing a whole class for <code>LD = L / D</code> is overkill. <code>om.ExecComp</code> makes a component from a formula written as text. New file <code>d09_execcomp.py</code>:</p>
+{{code:d09_execcomp.py}}
+{{out:d09_execcomp.py}}
+<dl class="lines">
+  <dt><code>om.ExecComp('LD = L / D')</code></dt>
+  <dd>Creates a component with inputs <code>L</code> and <code>D</code> and output <code>LD</code>. It works out its own derivatives, so no <code>declare_partials</code> is needed.</dd>
+  <dt><code>dL={'units': 'N'}, …, g={'units': 'm/s**2', 'val': 9.81}</code></dt>
+  <dd>Units and starting values for each variable, given as a small dictionary per variable. Without units, ExecComp variables have none, and OpenMDAO warns if you connect one to a variable that has units.</dd>
+  <dt><code>p.model.set_input_defaults('L', 5000.0, units='N')</code></dt>
+  <dd><code>L</code> is an input to <em>both</em> ExecComps, promoted to the same name, but one declares units and the other doesn't. <code>set_input_defaults</code> tells OpenMDAO which value and units the shared input should have. Day 10 shows the error you get without it.</dd>
+</dl>
+
+<h3 id="d9-6"><span class="sec">9.6</span>Seeing your model: the N2 diagram</h3>
+<p>OpenMDAO can draw your model as an interactive web page. New file <code>d09_n2.py</code>:</p>
+{{code:d09_n2.py}}
+<p>Open <code>my_model_n2.html</code> in your web browser, or use <code>show_browser=True</code> to open it automatically. (Every run also saves one as <code>n2.html</code> in the <code>…_out/reports</code> folder.) How to read it:</p>
+<ul>
+  <li>The coloured boxes on the <strong>diagonal</strong> are your variables, grouped by component.</li>
+  <li>A dark square <strong>off the diagonal</strong> is a connection. Above the diagonal, data flows downward to a later component. Below the diagonal, data flows back up to an earlier one: a <strong>feedback loop</strong>, which needs a solver (Day 13).</li>
+  <li>Click a group on the left to zoom in. Hover a square to see exactly which output feeds which input.</li>
+</ul>
+<p>Make it a habit: when a model gives strange numbers, look at its N2 diagram first. Unconnected inputs and wrong connections are easy to spot there.</p>
+
+<div class="practice">
+<h3>Practice</h3>
+<ol class="ex">
+  <li><p><strong>Does it fly?</strong> Build a group <code>LiftCheck</code> containing a <code>Weight</code> component (input <code>m</code>, output <code>W</code>), a <code>Lift</code> component (inputs <code>q</code> and <code>CL</code>, option <code>S</code>, output <code>L</code>), and an <code>ExecComp</code> computing <code>dL = L - W</code>, all promoted. Run it with m = 500 kg, q = 1531.25 Pa and C<sub>L</sub> = 0.32. Is lift enough?</p>
+    <details><summary>Show solution</summary>{{code:d09_ex1.py}}{{out:d09_ex1.py}}<p>5 N short: just slightly too little lift.</p></details></li>
+  <li><p><strong>Break the order.</strong> In <code>d09_group.py</code>, move <code>aero</code> to be added first. Predict which outputs will be wrong before running it, then run it and check.</p>
+    <details><summary>Show answer</summary><p><code>L</code> and <code>D</code> will be wrong (zero, in fact), because <code>aero</code> runs while <code>q</code> still has its starting value of 0. <code>rho</code> and <code>q</code> will be correct, because they're computed after it in the right order.</p></details></li>
+  <li><p><strong>Read an N2.</strong> Add <code>om.n2(p, outfile='flight_n2.html', show_browser=False)</code> after <code>p.setup()</code> in <code>d09_group.py</code>, open the file, and find the two connections (<code>rho</code> and <code>q</code>).</p>
+    <details><summary>Show answer</summary><p>You should see two dark squares above the diagonal: one from <code>atmos.rho</code> to <code>dynp.rho</code>, and one from <code>dynp.q</code> to <code>aero.q</code>. The inputs <code>h</code>, <code>v</code> and <code>alpha</code> are fed by the hidden <code>_auto_ivc</code> component at the top.</p></details></li>
+  <li><p><strong>Same model, explicit wiring.</strong> Rebuild the flight model without promotion: add <code>atmos</code>, <code>dynp</code> and <code>aero</code> directly to <code>p.model</code>, and wire them with two <code>connect</code> calls. Import the classes from <code>flight_components.py</code>. You should get the same L and D as 9.2.</p>
+    <details><summary>Show solution</summary>{{code:d09_ex4.py}}{{out:d09_ex4.py}}</details></li>
+</ol>
+</div>
+
+<div class="checkpoint">
+<h3>Checkpoint</h3>
+<p>You can now:</p>
+<ul>
+  <li>write an <code>om.Group</code> subclass whose <code>setup</code> adds subsystems</li>
+  <li>explain how promotion connects variables with the same name</li>
+  <li>connect variables explicitly with <code>connect('comp.output', 'comp.input')</code></li>
+  <li>explain why the order of <code>add_subsystem</code> matters</li>
+  <li>write quick formulas with <code>ExecComp</code>, including units</li>
+  <li>generate and read an N2 diagram</li>
+</ul>
+<label class="done"><input type="checkbox" id="done-9" data-day="9"> I've finished Day 9</label>
+</div>
+</section>

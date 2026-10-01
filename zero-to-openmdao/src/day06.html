@@ -1,0 +1,127 @@
+<section class="day" id="day-6">
+<header class="day-head">
+  <p class="eyebrow">Week 2 · Scientific Python and OpenMDAO basics</p>
+  <h2><span class="dn">Day 6</span> NumPy: math on whole arrays at once</h2>
+  <dl class="meta">
+    <dt>Time</dt><dd>3–4 hours</dd>
+    <dt>Goal</dt><dd>Create arrays, do math on all their elements without loops, pick out elements, work with tables, and interpolate aerodynamic data.</dd>
+  </dl>
+</header>
+
+<div class="warmup">
+  <h3>Warm-up from memory</h3>
+  <ol>
+    <li>Inside a class, what is <code>self</code>?</li>
+    <li>What does <code>super().__init__(...)</code> do?</li>
+    <li>In OpenMDAO, who calls your <code>compute</code> method?</li>
+  </ol>
+  <details class="answer"><summary>Answers</summary>
+    <p>1. The object the method is working on. 2. It runs the parent class's <code>__init__</code>, so the parent can set up its attributes. 3. OpenMDAO does, when the model runs. You never call it yourself.</p>
+  </details>
+</div>
+
+<h3 id="d6-1"><span class="sec">6.1</span>Why NumPy?</h3>
+<p>On Day 2 you needed a <code>for</code> loop to compute density at 5 altitudes. NumPy (<em>Numerical Python</em>) adds the <strong>array</strong>: a list of numbers that you can do math on <strong>all at once</strong>. This is called <em>vectorized</em> math. It's shorter, clearer, and much faster for large data. OpenMDAO and Dymos are built on NumPy arrays. New file <code>d06_first.py</code>:</p>
+{{code:d06_first.py}}
+{{out:d06_first.py}}
+<dl class="lines">
+  <dt><code>import numpy as np</code></dt><dd>Everyone nicknames NumPy <code>np</code>.</dd>
+  <dt><code>np.linspace(0, 80000, 9)</code></dt><dd>9 evenly spaced numbers from 0 to 80000, both ends included.</dd>
+  <dt><code>1.225 * np.exp(-h / 8500)</code></dt><dd><code>h</code> is an array, so <code>-h / 8500</code> divides <em>every</em> element, <code>np.exp</code> takes eˣ of every element, and the result is an array of 9 densities. No loop.</dd>
+</dl>
+<aside class="callout note">
+  <p class="callout-h">Reading 1.16484119e-01</p>
+  <p>NumPy prints in scientific notation when numbers have very different sizes. <code>e-01</code> means × 10⁻¹, so <code>1.16484119e-01</code> = 0.116 and <code>1.00151766e-04</code> = 0.0001.</p>
+</aside>
+
+<h3 id="d6-2"><span class="sec">6.2</span>Making arrays</h3>
+{{code:d06_create.py}}
+{{out:d06_create.py}}
+<div class="table-wrap"><table>
+  <thead><tr><th>Function</th><th>Gives</th></tr></thead>
+  <tbody>
+    <tr><td><code>np.array([1.0, 2.0, 3.0])</code></td><td>an array made from a list</td></tr>
+    <tr><td><code>np.zeros(n)</code>, <code>np.ones(n)</code></td><td><code>n</code> zeros or ones, used as starting values. You saw these in the HGV code.</td></tr>
+    <tr><td><code>np.arange(start, stop, step)</code></td><td>like <code>range</code>: stop is <em>not</em> included</td></tr>
+    <tr><td><code>np.linspace(start, stop, n)</code></td><td><code>n</code> points, stop <em>is</em> included. Use it when you know how many points you want.</td></tr>
+    <tr><td><code>a.shape</code>, <code>a.size</code>, <code>a.dtype</code></td><td>size along each direction, total count, and number type (<code>float64</code> is a normal decimal)</td></tr>
+  </tbody>
+</table></div>
+
+<h3 id="d6-3"><span class="sec">6.3</span>Lists vs arrays: the big difference</h3>
+{{code:d06_list_vs_array.py}}
+{{out:d06_list_vs_array.py}}
+<p>A list times 2 is the list <em>repeated</em>. An array times 2 multiplies every <em>element</em>. Two arrays of the same length combine element by element: first with first, second with second, and so on. For numbers, use arrays.</p>
+
+<h3 id="d6-4"><span class="sec">6.4</span>Picking out elements</h3>
+{{code:d06_index.py}}
+{{out:d06_index.py}}
+<dl class="lines">
+  <dt><code>rho[0]</code>, <code>rho[-1]</code>, <code>rho[2:5]</code></dt><dd>Indexing and slicing work exactly like lists (Day 2).</dd>
+  <dt><code>rho[::2]</code></dt><dd>A slice with a step: every second element.</dd>
+  <dt><code>high = h &gt; 40000</code></dt><dd>A comparison on an array gives an array of <code>True</code>/<code>False</code>, one per element. This is called a <strong>mask</strong>.</dd>
+  <dt><code>h[high]</code></dt><dd>Using a mask as an index keeps only the elements where the mask is <code>True</code>.</dd>
+  <dt><code>rho.max()</code>, <code>rho.min()</code>, <code>rho.mean()</code></dt><dd>Summaries of the whole array.</dd>
+  <dt><code>np.argmax(rho)</code></dt><dd>The <strong>index</strong> (position) of the largest value, not the value itself. Very useful: if <code>i = np.argmax(LD)</code>, then <code>alpha[i]</code> is the angle where L/D is largest.</dd>
+</dl>
+
+<h3 id="d6-5"><span class="sec">6.5</span>Tables: 2D arrays</h3>
+<p>Aerodynamic data often comes as a table, for example C<sub>L</sub> for several Mach numbers (rows) and angles of attack (columns). New file <code>d06_2d.py</code>:</p>
+{{code:d06_2d.py}}
+{{out:d06_2d.py}}
+<ul>
+  <li>A 2D array is made from a list of lists, one inner list per row.</li>
+  <li><code>.shape</code> is <code>(rows, columns)</code>.</li>
+  <li><code>CL_table[1, 2]</code> means row 1, column 2 (both counted from 0).</li>
+  <li><code>:</code> alone means "all": <code>[0, :]</code> is the whole of row 0, and <code>[:, 1]</code> is the whole of column 1.</li>
+</ul>
+
+<h3 id="d6-6"><span class="sec">6.6</span>Interpolating in a table</h3>
+<p>Your table has C<sub>L</sub> at 0°, 5° and 10°, but you need 7.5°. <strong>Interpolation</strong> draws a straight line between the neighbouring points. New file <code>d06_interp.py</code>:</p>
+{{code:d06_interp.py}}
+{{out:d06_interp.py}}
+<p><code>np.interp(x_wanted, x_table, y_table)</code> works for one value or for a whole array. Two rules: <code>x_table</code> must be in increasing order, and outside the table it does <strong>not</strong> extrapolate. It just returns the first or last value. Remember that when your HGV flies outside its aero data.</p>
+
+<h3 id="d6-7"><span class="sec">6.7</span>Saving and loading arrays</h3>
+<p>NumPy reads and writes CSV files in one line each, replacing all of Day 4's manual work. New file <code>d06_save_load.py</code>:</p>
+{{code:d06_save_load.py}}
+{{out:d06_save_load.py}}
+<dl class="lines">
+  <dt><code>np.column_stack([h, rho])</code></dt><dd>Glues two 1D arrays side by side into a 2-column table.</dd>
+  <dt><code>np.savetxt(…, delimiter=",", header="h_m,rho", comments="")</code></dt><dd>Writes the table with commas between columns and a header line. <code>comments=""</code> stops NumPy putting a <code>#</code> in front of the header.</dd>
+  <dt><code>np.loadtxt(…, delimiter=",", skiprows=1)</code></dt><dd>Reads it back as a 2D array, skipping the header row.</dd>
+  <dt><code>data[:, 1]</code></dt><dd>All rows, column 1: the density column.</dd>
+</dl>
+
+<h3 id="d6-8"><span class="sec">6.8</span>Use <code>np.</code> functions on arrays, not <code>math.</code></h3>
+{{code:d06_math_vs_np.py}}
+{{out:d06_math_vs_np.py|label=Output (an error, on purpose)}}
+<p>The <code>math</code> module only understands single numbers. On arrays, use <code>np.sin</code>, <code>np.cos</code>, <code>np.tan</code>, <code>np.exp</code>, <code>np.log</code>, <code>np.sqrt</code>, <code>np.radians</code>, <code>np.degrees</code> and <code>np.pi</code>. They also work on single numbers, so from now on just use the <code>np.</code> versions.</p>
+
+<div class="practice">
+<h3>Practice</h3>
+<ol class="ex">
+  <li><p><strong>Where does the air get thin?</strong> Make altitudes from 0 to 100 km in 1 km steps with <code>np.arange</code> and compute density. Use a mask to find the first altitude where ρ &lt; 0.001 kg/m³, and count how many altitudes are that thin. Hint: <code>np.argmax</code> on a True/False array gives the index of the first <code>True</code>, and <code>np.sum</code> counts the <code>True</code>s.</p>
+    <details><summary>Show solution</summary>{{code:d06_ex1.py}}{{out:d06_ex1.py}}</details></li>
+  <li><p><strong>Best L/D without a loop.</strong> Make 201 angles of attack from 0° to 20°. With C<sub>L</sub> = 4α (α in radians) and C<sub>D</sub> = 0.02 + 0.1·C<sub>L</sub>², find the angle with the highest L/D using <code>np.argmax</code>. Compare with Day 3's while-loop search.</p>
+    <details><summary>Show solution</summary>{{code:d06_ex2.py}}{{out:d06_ex2.py}}<p>Remember <strong>6.4°</strong>. This glider's best L/D angle will come back on Days 10, 14 and 15.</p></details></li>
+  <li><p><strong>Interpolate an aero table.</strong> Lift-curve slope C<sub>Lα</sub> is known at Mach 2, 4, 6, 8 and 10 as 2.5, 2.0, 1.7, 1.6 and 1.55 per radian. Interpolate it at Mach 5 and Mach 7.3.</p>
+    <details><summary>Show solution</summary>{{code:d06_ex3.py}}{{out:d06_ex3.py}}</details></li>
+  <li><p><strong>Replace a loop.</strong> Rewrite Day 2's density table (0 to 80 km every 10 km) in two lines of NumPy, with no loop.</p>
+    <details><summary>Show solution</summary>{{code:d06_ex4.py}}{{out:d06_ex4.py}}</details></li>
+</ol>
+</div>
+
+<div class="checkpoint">
+<h3>Checkpoint</h3>
+<p>You can now:</p>
+<ul>
+  <li>create arrays with <code>np.array</code>, <code>np.zeros</code>, <code>np.ones</code>, <code>np.arange</code> and <code>np.linspace</code></li>
+  <li>do element-by-element math with no loops, using <code>np.</code> functions</li>
+  <li>index, slice and filter with masks, and find positions with <code>np.argmax</code></li>
+  <li>use 2D arrays with <code>[row, column]</code> and <code>:</code></li>
+  <li>interpolate tables with <code>np.interp</code>, and save and load CSVs</li>
+</ul>
+<label class="done"><input type="checkbox" id="done-6" data-day="6"> I've finished Day 6</label>
+</div>
+</section>

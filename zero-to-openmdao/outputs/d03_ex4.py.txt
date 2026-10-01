@@ -1,0 +1,2 @@
+Best CL by search: 0.45, L/D = 11.18
+Theory: CL = 0.447, L/D = 11.18

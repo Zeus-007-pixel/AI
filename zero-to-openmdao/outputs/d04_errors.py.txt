@@ -1,0 +1,4 @@
+0 m: 1.2250 kg/m^3
+5000 m: 0.6803 kg/m^3
+Skipped -100: Altitude must not be negative, got -100
+20000 m: 0.1165 kg/m^3

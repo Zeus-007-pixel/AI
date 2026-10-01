@@ -1,0 +1,103 @@
+<section class="day" id="day-14">
+<header class="day-head">
+  <p class="eyebrow">Week 3 · Deeper OpenMDAO, then Dymos</p>
+  <h2><span class="dn">Day 14</span> Capstone: optimize a glider with a simulation inside</h2>
+  <dl class="meta">
+    <dt>Time</dt><dd>3–4 hours</dd>
+    <dt>Goal</dt><dd>Combine everything (functions, classes, NumPy, solve_ivp, OpenMDAO components, FD derivatives, drivers) to find the angle of attack that makes a glider fly farthest. Then see why this approach hits a wall.</dd>
+  </dl>
+</header>
+
+<div class="warmup">
+  <h3>Warm-up from memory</h3>
+  <ol>
+    <li>What is a residual?</li>
+    <li>In <code>solve_ivp</code>, what do <code>.terminal = True</code> and <code>.direction = -1</code> do on an event function?</li>
+    <li>Which derivative method must you use for a component that runs a simulation, and why?</li>
+  </ol>
+  <details class="answer"><summary>Answers</summary>
+    <p>1. A quantity that must become zero when an implicit output is correct. 2. Stop the simulation when the event happens, and only count crossings going downward. 3. <code>method='fd'</code>, because complex numbers can't pass through the solver, so only finite differences work.</p>
+  </details>
+</div>
+
+<h3 id="d14-1"><span class="sec">14.1</span>The project</h3>
+<p>Our glider (500 kg, 10 m², C<sub>D</sub> = 0.02 + 0.1·C<sub>L</sub>²) is released at 5 km altitude, flying level at 100 m/s. It holds one constant angle of attack until it lands. <strong>Which angle gives the longest range?</strong></p>
+<p>The plan:</p>
+<ol>
+  <li>An ODE function with the flat-Earth glider equations (Day 7 style).</li>
+  <li>A component whose <code>compute</code> runs a full <code>solve_ivp</code> simulation: α in, range out.</li>
+  <li>An optimizer that changes α to maximize range, with FD derivatives (Day 11).</li>
+</ol>
+<p><strong>Before reading the solution, try to write it yourself</strong> using the plan above and your Day 7 and Day 10 files. Give yourself an hour, then compare with the code below.</p>
+
+<h3 id="d14-2"><span class="sec">14.2</span>The solution, line by line</h3>
+<p>New file <code>d14_capstone.py</code>:</p>
+{{code:d14_capstone.py}}
+{{out:d14_capstone.py}}
+<p><strong>Part 1: the physics</strong></p>
+<dl class="lines">
+  <dt><code>def glider_rates(t, state, alpha, m, S):</code></dt>
+  <dd>A Day 7 ODE function with three <em>extra</em> parameters after the usual <code>t, state</code>. The state is <code>[x, h, v, gamma]</code>: distance, altitude, speed and flight-path angle.</dd>
+  <dt>The <code>return [...]</code> list</dt>
+  <dd>The four rates, the same equations as <code>GliderODE</code> (Day 12): ẋ = v cos γ, ḣ = v sin γ, v̇ = −D/m − g sin γ, γ̇ = (L/m − g cos γ)/v.</dd>
+  <dt><code>def reach_ground(t, state, alpha, m, S):</code></dt>
+  <dd>An event function. It must accept the same extra parameters as the ODE, even though it doesn't use them.</dd>
+</dl>
+<p><strong>Part 2: the simulation component</strong></p>
+<dl class="lines">
+  <dt><code>self.options.declare('m', default=500.0, …)</code></dt>
+  <dd>Mass and area are fixed options. α, the launch height and the launch speed are inputs, so an optimizer can change them.</dd>
+  <dt><code>self.declare_partials('*', '*', method='fd', step=1e-6, step_calc='rel')</code></dt>
+  <dd>Finite differences, because complex step can't pass through <code>solve_ivp</code>. <code>step_calc='rel'</code> makes the step relative to the input's size (1e-6 × the value), which suits inputs of very different sizes.</dd>
+  <dt><code>alpha = inputs['alpha'][0]</code></dt>
+  <dd>Inputs are arrays. <code>[0]</code> takes the single number out, because <code>solve_ivp</code> wants plain numbers here.</dd>
+  <dt><code>start = [0.0, inputs['h0'][0], inputs['v0'][0], 0.0]</code></dt>
+  <dd>Starting state: x = 0, the given height and speed, and level flight (γ = 0).</dd>
+  <dt><code>solve_ivp(glider_rates, (0.0, 1e5), start, args=(alpha, m, S), events=reach_ground, rtol=1e-10, atol=1e-8)</code></dt>
+  <dd><code>args=(...)</code> passes the extra values to both the ODE and the event function, after <code>t</code> and <code>state</code>. The time span is "up to 100 000 s", but the event stops it at landing. The tight tolerances make the range smooth, so FD derivatives are accurate. That's essential, because noisy derivatives confuse optimizers.</dd>
+  <dt><code>outputs['range'] = sol.y[0, -1]</code></dt>
+  <dd>Final x, the landing point. <code>sol.t[-1]</code> is the landing time.</dd>
+</dl>
+<p><strong>Part 3: the optimization</strong></p>
+<dl class="lines">
+  <dt><code>add_design_var('alpha', lower=1.0, upper=15.0, units='deg')</code></dt>
+  <dd>Search between 1° and 15°.</dd>
+  <dt><code>add_objective('range', ref=-1e4)</code></dt>
+  <dd>A negative <code>ref</code> means maximize, and 1e4 is the typical size (10 km) for scaling.</dd>
+</dl>
+<p><strong>Result:</strong> α = 6.23°, range 58.9 km, flight time about 20 minutes. Sanity check: the best L/D was 11.18 at 6.4° (Days 6 and 10). Gliding 5 km down at L/D ≈ 11 gives about 56 km, and the starting speed adds a little extra energy. The optimizer found almost exactly the best-L/D angle, which is what glider pilots are taught.</p>
+
+<h3 id="d14-3"><span class="sec">14.3</span>The wall you just hit</h3>
+<p>We forced one constant angle for the whole flight. A real pilot changes it continuously. So what's the best α at <em>every moment</em>? You could make α a list of, say, 100 values (one per 10 seconds) as 100 design variables. But then:</p>
+<ul>
+  <li>each FD derivative needs 100 extra simulations per optimizer iteration, which is very slow</li>
+  <li>adaptive solver steps and the landing event make the range slightly jumpy, so the FD derivatives get noisy and the optimizer struggles</li>
+  <li>adding constraints on the path, such as "q must stay below some limit at every moment", gets awkward</li>
+</ul>
+<p>Finding a whole <em>history</em> of controls is called <strong>optimal control</strong>, and it needs a different approach. That approach is Dymos, tomorrow.</p>
+
+<div class="practice">
+<h3>Practice</h3>
+<ol class="ex">
+  <li><p><strong>Two design variables.</strong> Also let the optimizer choose the launch speed <code>v0</code> between 60 and 150 m/s (use <code>ref=100.0</code>). Predict the answer before running.</p>
+    <details><summary>Show solution</summary><py label="the only addition, after the alpha design variable">p.model.add_design_var('v0', lower=60.0, upper=150.0, units='m/s', ref=100.0)</py>{{out:d14_ex1.py|tail=4}}<p>The speed goes straight to its upper bound, because more launch speed is more energy, which means more range. When a design variable sits on its bound, ask whether the bound is real or whether the problem is missing a cost.</p></details></li>
+  <li><p><strong>A time limit.</strong> Back to α only. Add a constraint that the flight must last at most 900 s (<code>add_constraint('flight_time', upper=900.0, ref=100.0)</code>). What happens to α and the range?</p>
+    <details><summary>Show solution</summary>{{out:d14_ex2.py|tail=3}}<p>To land sooner the glider must fly faster, which means a lower α (4.17°) and a less efficient glide (54.3 km). The constraint is active: exactly 900 s.</p></details></li>
+  <li><p><strong>A heavier glider.</strong> Remove the time limit and create the component with <code>GlideSimulation(m=1000.0)</code>. How much do the best α, range and time change?</p>
+    <details><summary>Show solution</summary>{{out:d14_ex3.py|tail=3}}<p>The range barely changes (59.3 km): glide range depends on L/D, not weight. But the heavier glider must fly faster to hold itself up, so it lands sooner (865 s instead of 1197 s).</p></details></li>
+</ol>
+</div>
+
+<div class="checkpoint">
+<h3>Checkpoint</h3>
+<p>You can now:</p>
+<ul>
+  <li>wrap a full simulation in an OpenMDAO component and optimize through it</li>
+  <li>pass extra parameters to <code>solve_ivp</code> with <code>args=(...)</code></li>
+  <li>choose FD derivatives with sensible step settings and tight solver tolerances</li>
+  <li>interpret active bounds and active constraints</li>
+  <li>explain why optimizing a control <em>history</em> needs a different tool</li>
+</ul>
+<label class="done"><input type="checkbox" id="done-14" data-day="14"> I've finished Day 14</label>
+</div>
+</section>

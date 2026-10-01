@@ -1,0 +1,4 @@
+  File "d01_ex4_broken.py", line 4
+    print("Wing loading: " + loading + " kg/m^2)
+                                       ^
+SyntaxError: unterminated string literal (detected at line 4)

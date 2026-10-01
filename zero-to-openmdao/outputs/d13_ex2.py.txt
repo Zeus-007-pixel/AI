@@ -1,0 +1,3 @@
+h =  0.0 km -> trim alpha =  4.588 deg
+h =  5.0 km -> trim alpha =  8.263 deg
+h = 10.0 km -> trim alpha = 14.880 deg

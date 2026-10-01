@@ -1,0 +1,10 @@
+Optimization terminated successfully    (Exit mode 0)
+            Current function value: -5.425395928259982
+            Iterations: 5
+            Function evaluations: 5
+            Gradient evaluations: 5
+Optimization Complete
+-----------------------------------
+Best constant alpha: 4.17 deg
+Range: 54.25 km
+Flight time: 900 s

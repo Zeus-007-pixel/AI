@@ -1,0 +1,1 @@
+Best L/D = 11.18 at alpha = 6.4 deg (CL = 0.447)

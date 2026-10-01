@@ -1,0 +1,10 @@
+ 0 km: 1.225000 kg/m^3
+10 km: 0.377747 kg/m^3
+20 km: 0.116484 kg/m^3
+30 km: 0.035920 kg/m^3
+40 km: 0.011076 kg/m^3
+50 km: 0.003416 kg/m^3
+60 km: 0.001053 kg/m^3
+70 km: 0.000325 kg/m^3
+80 km: 0.000100 kg/m^3
+Below 1% of sea-level density from 40 km

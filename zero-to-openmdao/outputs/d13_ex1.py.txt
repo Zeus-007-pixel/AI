@@ -1,0 +1,4 @@
+v =  40.0 m/s -> alpha =  7.169 deg (hand calculation)
+v =  50.0 m/s -> alpha =  4.588 deg (hand calculation)
+v =  80.0 m/s -> alpha =  1.792 deg (hand calculation)
+v = 120.0 m/s -> alpha =  0.797 deg (hand calculation)

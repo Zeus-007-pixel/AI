@@ -1,0 +1,13 @@
+[10000.]
+[5000.]
+2 Explicit Output(s) in 'model'
+
+varname     val       prom_name   
+----------  --------  ------------
+big_wing
+  L         [10000.]  big_wing.L  
+small_wing
+  L         [5000.]   small_wing.L
+
+
+0 Implicit Output(s) in 'model'

@@ -1,0 +1,218 @@
+<section class="day" id="day-1">
+<header class="day-head">
+  <p class="eyebrow">Week 1 · Python foundations</p>
+  <h2><span class="dn">Day 1</span> Setup and your first programs</h2>
+  <dl class="meta">
+    <dt>Time</dt><dd>About 4 hours (setup takes about 45 minutes of it)</dd>
+    <dt>Goal</dt><dd>Install everything, run your first program, and use variables, math, text and error messages.</dd>
+  </dl>
+</header>
+
+<h3 id="d1-1"><span class="sec">1.1</span>What programming is</h3>
+<p>A <strong>program</strong> is a list of instructions that a computer carries out one after another, exactly as written. It doesn't guess what you meant. If you write something slightly wrong, it either stops with an error message or quietly does the wrong thing.</p>
+<p><strong>Python</strong> is a language for writing those instructions. It reads almost like English, it's free, and engineers use it everywhere because of its <strong>libraries</strong>: ready-made code that other people wrote and shared. You'll use these libraries:</p>
+<ul>
+  <li><strong>NumPy</strong>: fast math on lists of numbers</li>
+  <li><strong>Matplotlib</strong>: plots</li>
+  <li><strong>SciPy</strong>: simulations and simple optimizers</li>
+  <li><strong>OpenMDAO</strong>: building and optimizing engineering models (NASA made it)</li>
+  <li><strong>Dymos</strong>: trajectory optimization, built on OpenMDAO</li>
+</ul>
+<p>A Python program is a plain text file whose name ends in <code>.py</code>. You write it in an <strong>editor</strong> (we use VS Code) and run it with Python.</p>
+
+<h3 id="d1-2"><span class="sec">1.2</span>Install the tools</h3>
+<p><strong>Step 1: install Python.</strong></p>
+<ol>
+  <li>Go to <a href="https://www.python.org/downloads/">python.org/downloads</a>. Scroll down to "Looking for a specific release?", find <strong>Python 3.12.10</strong> and click its Download link. It's the newest 3.12 that still comes with a normal installer; later 3.12 versions are source code only. The course was tested with Python 3.11, and 3.12 behaves the same for everything here.</li>
+  <li>On that page, scroll to "Files". Download <strong>Windows installer (64-bit)</strong>, or on a Mac, the <strong>macOS 64-bit universal2 installer</strong>.</li>
+  <li><strong>Windows:</strong> run the installer. On the first screen, <strong>tick the box "Add python.exe to PATH"</strong> at the bottom. This matters: without it, typing <code>python</code> won't work. Then click "Install Now".<br><strong>Mac:</strong> open the downloaded <code>.pkg</code> file and click Continue until it finishes.</li>
+</ol>
+<p><strong>Step 2: install VS Code</strong>, the editor where you'll write code.</p>
+<ol>
+  <li>Download it from <a href="https://code.visualstudio.com/">code.visualstudio.com</a> and install it.</li>
+  <li>Open VS Code. On the left edge, click the icon of four small squares (<strong>Extensions</strong>). Search for <strong>Python</strong> and install the one published by <strong>Microsoft</strong>. It lets VS Code run Python and colours your code.</li>
+</ol>
+<p><strong>Step 3: make your course folder.</strong> Create a folder called <code>pycourse</code> in your Documents folder. In VS Code choose <strong>File → Open Folder…</strong> and pick <code>pycourse</code>. Every file for this course goes in there.</p>
+<p><strong>Step 4: open the terminal.</strong> In VS Code choose <strong>Terminal → New Terminal</strong>. A panel opens at the bottom. The <strong>terminal</strong> is a window where you type commands to your computer instead of clicking. Type this and press <kbd>Enter</kbd>:</p>
+<sh>python --version</sh>
+<txt>Python 3.12.10</txt>
+<aside class="callout warn">
+  <p class="callout-h">Mac users</p>
+  <p>On a Mac, type <code>python3</code> instead of <code>python</code> everywhere in this course: <code>python3 --version</code>, <code>python3 d01_hello.py</code>, <code>python3 -m pip …</code>. On Windows, if <code>python</code> says "not recognized", try <code>py</code> instead. If that fails too, reinstall Python with the PATH box ticked.</p>
+</aside>
+<p><strong>Step 5: install the libraries.</strong> In the terminal, type this as <strong>one line</strong> and press <kbd>Enter</kbd>. It takes a few minutes:</p>
+<sh>python -m pip install numpy scipy matplotlib openmdao==3.45.1 dymos==1.15.1</sh>
+<p><code>pip</code> is Python's library installer, like an app store you use by typing. <code>python -m pip install</code> means "use Python's pip to install the following". The <code>==3.45.1</code> picks the exact version this course was tested with, so your outputs match mine. When it finishes, check that it worked:</p>
+<sh>python -c "import openmdao, dymos; print(openmdao.__version__, dymos.__version__)"</sh>
+<txt>3.45.1 1.15.1</txt>
+<p>If you see those two version numbers, setup is done. The <code>-c</code> flag means "run this short piece of code", so you just ran your first line of Python.</p>
+<p><strong>Step 6: tell VS Code which Python to use.</strong> Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> (on a Mac, <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>), type <code>Python: Select Interpreter</code>, press <kbd>Enter</kbd> and choose the Python 3.12 you installed.</p>
+
+<h3 id="d1-3"><span class="sec">1.3</span>Your first program</h3>
+<p>In VS Code choose <strong>File → New File…</strong>, name it <code>d01_hello.py</code> and save it in <code>pycourse</code>. Type these two lines:</p>
+{{code:d01_hello.py}}
+<p>Save with <kbd>Ctrl</kbd>+<kbd>S</kbd>. Now run it. There are two ways:</p>
+<ul>
+  <li>In the terminal, type <code>python d01_hello.py</code> and press <kbd>Enter</kbd>.</li>
+  <li>Or click the small ▷ <strong>Run Python File</strong> triangle at the top right of the editor.</li>
+</ul>
+{{out:d01_hello.py}}
+<dl class="lines">
+  <dt><code>print("Hello, world!")</code></dt>
+  <dd><code>print</code> is a built-in <strong>function</strong>, a named command that does a job. Its job is to show whatever is inside its round brackets on the screen. Running a function is called <em>calling</em> it, and you always call a function by writing round brackets after its name.</dd>
+  <dt><code>"Hello, world!"</code></dt>
+  <dd>Text must be inside quote marks. The quotes tell Python "this is text, not an instruction". Single quotes <code>'like this'</code> work too; just use the same kind at both ends.</dd>
+  <dt>Two lines</dt>
+  <dd>Python runs line 1, then line 2, top to bottom. Each <code>print</code> starts a new line on the screen.</dd>
+</dl>
+<aside class="callout note">
+  <p class="callout-h">Try it</p>
+  <p>Delete the closing quote mark on line 1 and run the file again. You get a <code>SyntaxError</code>, Python's way of saying "I can't understand the grammar of this line". Put the quote back. Breaking things on purpose is how you learn what errors mean.</p>
+</aside>
+<p><strong>Quick experiments.</strong> Type <code>python</code> on its own in the terminal and press <kbd>Enter</kbd>. The prompt changes to <code>&gt;&gt;&gt;</code>. This is <em>interactive mode</em>: type <code>2 + 3</code>, press <kbd>Enter</kbd>, and Python answers <code>5</code> straight away. It's handy for testing one line. Type <code>exit()</code> to leave. For anything longer than a line or two, use files.</p>
+
+<h3 id="d1-4"><span class="sec">1.4</span>Comments</h3>
+<p>Anything after a <code>#</code> on a line is a <strong>comment</strong>. Python ignores it completely. Comments are notes for humans, including future you. Use them to say what a number means or why a line exists.</p>
+<py># This whole line is a comment
+g = 9.81   # gravity in m/s^2 (the part after # is a comment too)</py>
+
+<h3 id="d1-5"><span class="sec">1.5</span>Variables: named boxes for values</h3>
+<p>A <strong>variable</strong> is a name that holds a value. Make a new file <code>d01_variables.py</code>:</p>
+{{code:d01_variables.py}}
+{{out:d01_variables.py}}
+<dl class="lines">
+  <dt><code>mass = 1000.0</code></dt>
+  <dd>Creates a variable called <code>mass</code> and stores <code>1000.0</code> in it. <strong>The <code>=</code> sign means "store the value on the right under the name on the left".</strong> It is not "equals" from maths, and it always works right-to-left.</dd>
+  <dt><code>g = 9.81</code></dt>
+  <dd>Same idea: a variable <code>g</code> holding 9.81.</dd>
+  <dt><code>weight = mass * g</code></dt>
+  <dd>Python first works out the right side: it looks up <code>mass</code> (1000.0) and <code>g</code> (9.81) and multiplies them (<code>*</code> means multiply). Then it stores the answer, 9810.0, in a new variable <code>weight</code>.</dd>
+  <dt><code>print(weight)</code></dt>
+  <dd>Prints the value stored in <code>weight</code>. There are no quotes, because we want the variable's value, not the word "weight".</dd>
+  <dt><code>print("The weight is", weight, "newtons")</code></dt>
+  <dd>You can give <code>print</code> several things separated by commas. It prints them in order with a space between each.</dd>
+</dl>
+<p><strong>Rules for names:</strong> use letters, digits and underscores (<code>_</code>). A name can't start with a digit and can't contain spaces. Capitals matter: <code>Mass</code> and <code>mass</code> are two different names. Pick names that say what the value is: <code>wing_area</code> is better than <code>x</code>.</p>
+<p><strong>Variables can change.</strong> Storing a new value replaces the old one:</p>
+<py>count = 1
+count = count + 1    # right side first: 1 + 1 = 2, then store 2 back in count
+print(count)         # 2</py>
+<p>Read <code>count = count + 1</code> as "the new count is the old count plus one". You'll use this pattern constantly.</p>
+
+<h3 id="d1-6"><span class="sec">1.6</span>Doing math</h3>
+<p>New file <code>d01_math.py</code>:</p>
+{{code:d01_math.py}}
+{{out:d01_math.py}}
+<div class="table-wrap"><table>
+  <thead><tr><th>Symbol</th><th>Meaning</th><th>Example</th><th>Result</th></tr></thead>
+  <tbody>
+    <tr><td><code>+ - *</code></td><td>add, subtract, multiply</td><td><code>7 * 2</code></td><td class="num">14</td></tr>
+    <tr><td><code>/</code></td><td>divide (always gives a decimal)</td><td><code>7 / 2</code></td><td class="num">3.5</td></tr>
+    <tr><td><code>//</code></td><td>divide and throw away the decimals</td><td><code>7 // 2</code></td><td class="num">3</td></tr>
+    <tr><td><code>%</code></td><td>remainder after dividing</td><td><code>7 % 2</code></td><td class="num">1</td></tr>
+    <tr><td><code>**</code></td><td>power (not <code>^</code>!)</td><td><code>7 ** 2</code></td><td class="num">49</td></tr>
+    <tr><td><code>1.5e3</code></td><td>scientific notation: 1.5 × 10³</td><td><code>2e-3</code></td><td class="num">0.002</td></tr>
+  </tbody>
+</table></div>
+<p>The order is the same as in school maths: brackets first, then powers, then <code>* /</code>, then <code>+ -</code>. When in doubt, add brackets.</p>
+
+<h3 id="d1-7"><span class="sec">1.7</span>The <code>math</code> module: square roots, sines and π</h3>
+<p>Basic Python has no square root or sine. These live in a <strong>module</strong>, an extra toolbox of functions, called <code>math</code>. You load it with <code>import</code>. New file <code>d01_math_module.py</code>:</p>
+{{code:d01_math_module.py}}
+{{out:d01_math_module.py}}
+<dl class="lines">
+  <dt><code>import math</code></dt>
+  <dd>Loads the <code>math</code> toolbox. Put imports at the top of the file.</dd>
+  <dt><code>h = 100e3</code></dt>
+  <dd>100 × 10³ = 100 000 metres. Scientific notation keeps big numbers readable.</dd>
+  <dt><code>r = R_earth + h</code></dt>
+  <dd>Distance from Earth's centre.</dd>
+  <dt><code>v_orbit = math.sqrt(mu / r)</code></dt>
+  <dd><code>math.sqrt</code> means "the <code>sqrt</code> function from the <code>math</code> toolbox". The dot means "inside". Python works out <code>mu / r</code> first, then takes its square root: the circular orbit speed v = √(μ/r).</dd>
+  <dt><code>print(math.pi)</code></dt>
+  <dd><code>math.pi</code> is a value stored in the toolbox: π.</dd>
+</dl>
+<p>Other useful ones: <code>math.sin(x)</code>, <code>math.cos(x)</code> and <code>math.tan(x)</code>. <strong>Angles are in radians</strong>, so convert with <code>math.radians(45)</code> and <code>math.degrees(0.785)</code>. Also <code>math.exp(x)</code> for eˣ and <code>math.log(x)</code> for the natural log.</p>
+
+<h3 id="d1-8"><span class="sec">1.8</span>Printing numbers neatly with f-strings</h3>
+<p>7848.432857300987 has far too many decimals. An <strong>f-string</strong> lets you put values inside text and choose how they look. New file <code>d01_fstrings.py</code>:</p>
+{{code:d01_fstrings.py}}
+{{out:d01_fstrings.py}}
+<dl class="lines">
+  <dt><code>f"Orbit speed: {v_orbit} m/s"</code></dt>
+  <dd>The <code>f</code> just before the opening quote turns on f-string mode. Anything inside curly braces <code>{ }</code> is worked out and its value is placed in the text.</dd>
+  <dt><code>{v_orbit:.1f}</code></dt>
+  <dd>The part after the colon is a <em>format</em>. <code>.1f</code> means "a decimal number with 1 digit after the point". <code>.2f</code> means 2 digits, and <code>.0f</code> means none.</dd>
+  <dt><code>{v_orbit / 1000:.2f}</code></dt>
+  <dd>You can put a calculation inside the braces. Here it converts to km/s first, then formats.</dd>
+</dl>
+<p>Other formats you'll see: <code>{x:.3e}</code> gives scientific notation like <code>7.848e+03</code>, and <code>{n:5d}</code> gives a whole number padded to 5 characters wide, which lines up columns.</p>
+
+<h3 id="d1-9"><span class="sec">1.9</span>Kinds of values (types)</h3>
+<p>Every value has a <strong>type</strong>, and the type decides what you can do with it. New file <code>d01_types.py</code>:</p>
+{{code:d01_types.py}}
+{{out:d01_types.py}}
+<div class="table-wrap"><table>
+  <thead><tr><th>Type</th><th>Name in Python</th><th>Examples</th></tr></thead>
+  <tbody>
+    <tr><td>Text ("string")</td><td><code>str</code></td><td><code>"HGV-1"</code>, <code>'m/s'</code></td></tr>
+    <tr><td>Whole number ("integer")</td><td><code>int</code></td><td><code>2</code>, <code>-15</code>, <code>1000</code></td></tr>
+    <tr><td>Decimal number ("float")</td><td><code>float</code></td><td><code>9.81</code>, <code>1000.0</code>, <code>1.5e3</code></td></tr>
+    <tr><td>True / False ("boolean")</td><td><code>bool</code></td><td><code>True</code>, <code>False</code> (capital first letter!)</td></tr>
+  </tbody>
+</table></div>
+<p><code>type(x)</code> tells you the type of <code>x</code>. <code>len(x)</code> tells you how many characters are in a string. <code>+</code> joins two strings together, and <code>*</code> repeats one.</p>
+<aside class="callout warn">
+  <p class="callout-h">Common error: mixing text and numbers</p>
+  <p><code>"Mass: " + 1000</code> fails with <code>TypeError: can only concatenate str (not "int") to str</code>, because Python won't glue text and a number together. Turn the number into text with <code>str(1000)</code>, or simply use an f-string: <code>f"Mass: {1000}"</code>.</p>
+</aside>
+
+<h3 id="d1-10"><span class="sec">1.10</span>Errors are normal: how to read them</h3>
+<p>Every programmer sees errors all day. They're not failures; they're Python telling you exactly what it couldn't do. Make <code>d01_error.py</code> with a deliberate typo (<code>mas</code> instead of <code>mass</code>):</p>
+{{code:d01_error.py}}
+{{out:d01_error.py|label=Output (an error)}}
+<p>An error report is called a <strong>traceback</strong>. Read it <strong>from the bottom up</strong>:</p>
+<ol>
+  <li><strong>Last line:</strong> <em>what</em> went wrong. <code>NameError: name 'mas' is not defined</code> means Python doesn't know any variable called <code>mas</code>. It even suggests <code>mass</code>.</li>
+  <li><strong>The lines above:</strong> <em>where</em>. The file name, <code>line 3</code>, the line itself, and <code>^^^</code> marks pointing at the problem. Your real file path appears where this shows just the file name.</li>
+</ol>
+<div class="table-wrap"><table>
+  <thead><tr><th>Error</th><th>What it usually means</th></tr></thead>
+  <tbody>
+    <tr><td><code>SyntaxError</code></td><td>The grammar is broken: a missing bracket, quote or colon. Python found it before running anything.</td></tr>
+    <tr><td><code>NameError</code></td><td>You used a name that doesn't exist. Usually a typo, or you used a variable before creating it.</td></tr>
+    <tr><td><code>TypeError</code></td><td>Wrong kind of value for the operation, like adding text to a number.</td></tr>
+    <tr><td><code>IndentationError</code></td><td>The spaces at the start of a line are wrong (you'll meet this on Day 2).</td></tr>
+    <tr><td><code>ZeroDivisionError</code></td><td>You divided by zero.</td></tr>
+  </tbody>
+</table></div>
+
+<div class="practice">
+<h3>Practice</h3>
+<ol class="ex">
+  <li><p><strong>Dynamic pressure.</strong> At about 30 km altitude, air density is ρ = 0.0184 kg/m³. A vehicle flies at v = 2000 m/s. Make <code>d01_ex1.py</code> to calculate q = ½ρv² and print it in Pa with no decimals, and in kPa with 1 decimal.</p>
+    <details><summary>Show solution</summary>{{code:d01_ex1.py}}{{out:d01_ex1.py}}</details></li>
+  <li><p><strong>Mach to speed.</strong> The speed of sound at 30 km is a = 301.7 m/s. Calculate the speed of a Mach 5 vehicle in m/s and km/h (1 m/s = 3.6 km/h). Print both in one sentence using an f-string.</p>
+    <details><summary>Show solution</summary>{{code:d01_ex2.py}}{{out:d01_ex2.py}}</details></li>
+  <li><p><strong>The ISS.</strong> The ISS flies at about 400 km altitude. Use v = √(μ/r) to find its speed. Then find how long one orbit takes: the period is 2πr / v. Print it in minutes.</p>
+    <details><summary>Show solution</summary>{{code:d01_ex3.py}}{{out:d01_ex3.py}}<p>About 92 minutes, which is right for the ISS.</p></details></li>
+  <li><p><strong>Fix the bugs.</strong> This file has three mistakes. Type it in, run it, and fix one error at a time, reading each error message. (Python reports the <code>SyntaxError</code> first, because it checks grammar before running anything.)</p>
+    {{code:d01_ex4_broken.py}}
+    <details><summary>Show solution</summary><p>Mistake 1: the closing quote after <code>kg/m^2</code> is missing (SyntaxError). Mistake 2: <code>Mass</code> should be <code>mass</code> (NameError). Mistake 3: <code>"text" + loading</code> adds text to a number (TypeError), so use <code>str(loading)</code> or an f-string.</p>{{code:d01_ex4.py}}{{out:d01_ex4.py}}</details></li>
+</ol>
+</div>
+
+<div class="checkpoint">
+<h3>Checkpoint</h3>
+<p>You can now:</p>
+<ul>
+  <li>create a <code>.py</code> file in VS Code and run it, both from the terminal and with the ▷ button</li>
+  <li>store values in variables, and explain that <code>=</code> means "store", not "equals"</li>
+  <li>do arithmetic, including <code>**</code> for powers, and use <code>math.sqrt</code>, <code>math.sin</code> and <code>math.pi</code></li>
+  <li>print numbers neatly with f-strings like <code>{x:.2f}</code></li>
+  <li>name the four basic types: <code>str</code>, <code>int</code>, <code>float</code> and <code>bool</code></li>
+  <li>read a traceback from the bottom up and find the line that caused it</li>
+</ul>
+<label class="done"><input type="checkbox" id="done-1" data-day="1"> I've finished Day 1</label>
+</div>
+</section>

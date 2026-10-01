@@ -1,0 +1,135 @@
+<section class="day" id="day-5">
+<header class="day-head">
+  <p class="eyebrow">Week 1 · Python foundations</p>
+  <h2><span class="dn">Day 5</span> Classes and objects: the key to OpenMDAO</h2>
+  <dl class="meta">
+    <dt>Time</dt><dd>3–4 hours. Take it slowly; this is the most important Python day for OpenMDAO.</dd>
+    <dt>Goal</dt><dd>Write classes with data and methods, build new classes on top of old ones, and understand how a framework like OpenMDAO calls code you write.</dd>
+  </dl>
+</header>
+
+<div class="warmup">
+  <h3>Warm-up from memory</h3>
+  <ol>
+    <li><code>helpers.py</code> contains <code>def square(x)</code>. How do you use it from <code>main.py</code> in the same folder?</li>
+    <li>What does <code>with open("a.txt", "w") as f:</code> do?</li>
+    <li>In a traceback, which line do you read first, and what does it tell you?</li>
+  </ol>
+  <details class="answer"><summary>Answers</summary>
+    <p>1. <code>import helpers</code>, then <code>helpers.square(3)</code>. Or <code>from helpers import square</code>. 2. It opens <code>a.txt</code> for writing (creating or replacing it), calls it <code>f</code>, and closes it automatically when the block ends. 3. The last line: <em>what</em> went wrong.</p>
+  </details>
+</div>
+
+<h3 id="d5-1"><span class="sec">5.1</span>What a class is</h3>
+<p>Think of a <strong>class</strong> as a blueprint, or a blank form. An <strong>object</strong> is one thing built from that blueprint, a filled-in copy. From one <code>Vehicle</code> blueprint you can build a glider object and an HGV object. Each holds its own data, but both know the same tricks.</p>
+<ul>
+  <li><strong>Attributes</strong> are the data an object carries: its mass, its area.</li>
+  <li><strong>Methods</strong> are functions that belong to the class and work on that data: its weight, its wing loading.</li>
+</ul>
+<p>You've used objects already. A list is an object, and <code>.append</code> is one of its methods. <strong>Every OpenMDAO component you write will be a class.</strong></p>
+
+<h3 id="d5-2"><span class="sec">5.2</span>Your first class</h3>
+<p>New file <code>d05_class.py</code>:</p>
+{{code:d05_class.py}}
+{{out:d05_class.py}}
+<dl class="lines">
+  <dt><code>class Vehicle:</code></dt>
+  <dd>Starts a blueprint called <code>Vehicle</code>. By convention, class names use CapitalizedWords. Everything indented below belongs to the class.</dd>
+  <dt><code>def __init__(self, name, mass, S):</code></dt>
+  <dd>A special method (two underscores on each side, said "dunder init"). Python runs it <strong>automatically when you create a new object</strong>. It sets up the object's starting data.</dd>
+  <dt><code>self</code></dt>
+  <dd>The first parameter of every method. It means <strong>"the object this is being done to"</strong>. When the glider runs <code>__init__</code>, <code>self</code> <em>is</em> the glider. You never pass <code>self</code> yourself; Python fills it in.</dd>
+  <dt><code>self.mass = mass</code></dt>
+  <dd>Stores the value of the parameter <code>mass</code> as an <strong>attribute</strong> of this object, so it's remembered after <code>__init__</code> ends. Without <code>self.</code> it would vanish, because of scope (Day 3).</dd>
+  <dt><code>def weight(self, g=9.81):</code></dt>
+  <dd>A method. It reads the object's own data through <code>self.mass</code>.</dd>
+  <dt><code>glider = Vehicle("Glider-1", 500.0, 10.0)</code></dt>
+  <dd>Builds an object. Python creates an empty object and calls <code>__init__(new_object, "Glider-1", 500.0, 10.0)</code>, then stores the object in <code>glider</code>.</dd>
+  <dt><code>glider.weight()</code></dt>
+  <dd>Calls the method. Python passes <code>glider</code> as <code>self</code> automatically, which is why the brackets can be empty.</dd>
+  <dt><code>hgv.mass = 1100.0</code></dt>
+  <dd>Changes one object's attribute. The glider is unaffected, because each object has its own data.</dd>
+</dl>
+<aside class="callout warn">
+  <p class="callout-h">Common error: forgetting self</p>
+  <p>If you write <code>def wing_loading():</code> without <code>self</code>, then <code>glider.wing_loading()</code> fails with <code>TypeError: Vehicle.wing_loading() takes 0 positional arguments but 1 was given</code>. The "1 given" is the object Python passed in as <code>self</code>. Inside a method, writing <code>mass</code> instead of <code>self.mass</code> gives a <code>NameError</code>.</p>
+</aside>
+
+<h3 id="d5-3"><span class="sec">5.3</span>Inheritance: building on an existing class</h3>
+<p>A glider <em>is a</em> vehicle with extra aerodynamic data. Instead of copying <code>Vehicle</code>, we <strong>inherit</strong> from it. New file <code>d05_inherit.py</code>:</p>
+{{code:d05_inherit.py}}
+{{out:d05_inherit.py}}
+<dl class="lines">
+  <dt><code>class Glider(Vehicle):</code></dt>
+  <dd>The class in brackets is the <strong>parent</strong>. <code>Glider</code> automatically gets every method of <code>Vehicle</code>, such as <code>weight</code>, without retyping it.</dd>
+  <dt><code>super().__init__(name, mass, S)</code></dt>
+  <dd><code>super()</code> means "my parent class". This line runs <code>Vehicle</code>'s own <code>__init__</code>, which stores <code>name</code>, <code>mass</code> and <code>S</code>. Then the next lines store the glider's extra data.</dd>
+  <dt><code>def max_LD(self):</code></dt>
+  <dd>A new method that only gliders have.</dd>
+  <dt><code>def describe(self):</code> in <code>Glider</code></dt>
+  <dd><strong>Overriding</strong>: the child defines a method with the same name as the parent's. For gliders, the child's version wins.</dd>
+</dl>
+
+<h3 id="d5-4"><span class="sec">5.4</span>How frameworks call your code: OpenMDAO in miniature</h3>
+<p>This section explains how OpenMDAO works, before you've touched OpenMDAO.</p>
+<p>A <strong>framework</strong> is a library that runs <em>your</em> code at the right moments. It gives you a parent class with empty methods. You write a child class that fills them in, and the framework calls them. Here is a 25-line imitation of OpenMDAO's <code>ExplicitComponent</code>. New file <code>d05_framework.py</code>:</p>
+{{code:d05_framework.py}}
+{{out:d05_framework.py}}
+<dl class="lines">
+  <dt><code>class MiniComponent:</code></dt>
+  <dd>The framework's parent class, the part "the library authors" wrote.</dd>
+  <dt><code>self.inputs = {}</code> and <code>self.outputs = {}</code></dt>
+  <dd>Each component holds two dictionaries for its values.</dd>
+  <dt><code>self.setup()</code> inside <code>__init__</code></dt>
+  <dd>When a component is created, the framework calls <code>setup</code>. Because of overriding, it runs <em>your</em> version of <code>setup</code>.</dd>
+  <dt><code>def setup(self): pass</code></dt>
+  <dd><code>pass</code> means "do nothing". It's a placeholder for an empty block. The parent leaves these methods empty for you to fill in.</dd>
+  <dt><code>def run(self): self.compute(self.inputs, self.outputs)</code></dt>
+  <dd>When the framework runs the component, it calls <em>your</em> <code>compute</code> and hands it the two dictionaries.</dd>
+  <dt><code>class DynamicPressure(MiniComponent):</code></dt>
+  <dd><strong>Your</strong> code: inherit from the framework class, and fill in only <code>setup</code> (declare inputs and outputs) and <code>compute</code> (the physics).</dd>
+  <dt><code>outputs["q"] = 0.5 * inputs["rho"] * inputs["v"] ** 2</code></dt>
+  <dd>Read inputs by name and store the output by name, just like dictionaries.</dd>
+</dl>
+<div class="table-wrap"><table>
+  <thead><tr><th>Our mini version</th><th>Real OpenMDAO (Day 8)</th></tr></thead>
+  <tbody>
+    <tr><td><code>class X(MiniComponent)</code></td><td><code>class X(om.ExplicitComponent)</code></td></tr>
+    <tr><td><code>def setup(self):</code> with <code>self.add_input</code> / <code>self.add_output</code></td><td>the same names, plus units and sizes</td></tr>
+    <tr><td><code>def compute(self, inputs, outputs):</code></td><td>exactly the same signature</td></tr>
+    <tr><td><code>comp.run()</code> calls <code>compute</code></td><td><code>prob.run_model()</code> calls <code>compute</code> of every component</td></tr>
+  </tbody>
+</table></div>
+<aside class="callout ok">
+  <p class="callout-h">The big idea</p>
+  <p>In OpenMDAO <strong>you never call <code>setup</code> or <code>compute</code> yourself</strong>. You write them, and OpenMDAO decides when to run them. When the HGV code from earlier in our conversation said <code>def compute(self, inputs, outputs):</code>, this is all that was happening.</p>
+</aside>
+
+<div class="practice">
+<h3>Practice</h3>
+<ol class="ex">
+  <li><p><strong>Stall speed.</strong> Add a method <code>stall_speed(self, rho, CL_max)</code> to <code>Vehicle</code>. It returns √(2W / (ρ·S·C<sub>L,max</sub>)), using <code>self.weight()</code>. Test the glider with C<sub>L,max</sub> = 1.2 at sea level (ρ = 1.225) and at 10 km (ρ = 0.3777).</p>
+    <details><summary>Show solution</summary>{{code:d05_ex1.py}}{{out:d05_ex1.py}}<p>Thinner air means you must fly faster to hold yourself up.</p></details></li>
+  <li><p><strong>An HGV class.</strong> Make <code>HGV(Vehicle)</code> with an extra attribute <code>nose_radius</code> and a method <code>heat_rate(self, rho, v)</code> for the Sutton–Graves stagnation heating: q̇ = 1.7415×10⁻⁴ · √(ρ / R<sub>n</sub>) · v³ (W/m²). Test with R<sub>n</sub> = 0.1 m, ρ = 0.0184 and v = 2000 m/s, and print the result in MW/m².</p>
+    <details><summary>Show solution</summary>{{code:d05_ex2.py}}{{out:d05_ex2.py}}</details></li>
+  <li><p><strong>Your own mini component.</strong> Using the <code>MiniComponent</code> class, write a <code>Lift</code> component with inputs <code>q</code>, <code>S</code> and <code>CL</code> and output <code>L</code> = q·S·C<sub>L</sub>. Run it with the defaults, then change <code>CL</code> to 0.8 and run it again.</p>
+    <details><summary>Show solution</summary>{{code:d05_ex3.py}}{{out:d05_ex3.py}}</details></li>
+  <li><p><strong>Explain it back.</strong> In your own words, write down who calls <code>setup()</code> and <code>compute()</code> in <code>d05_framework.py</code>, and at what moment.</p>
+    <details><summary>Show answer</summary><p><code>setup()</code> is called by <code>MiniComponent.__init__</code>, the moment you create the object with <code>DynamicPressure()</code>. <code>compute()</code> is called by <code>run()</code>. Your class only fills them in, and the parent class decides when they run. OpenMDAO works the same way.</p></details></li>
+</ol>
+</div>
+
+<div class="checkpoint">
+<h3>Checkpoint</h3>
+<p>You can now:</p>
+<ul>
+  <li>write a class with <code>__init__</code>, attributes (<code>self.x</code>) and methods</li>
+  <li>explain what <code>self</code> is and why every method has it</li>
+  <li>create several objects from one class and call their methods</li>
+  <li>inherit with <code>class Child(Parent)</code>, use <code>super().__init__()</code>, and override methods</li>
+  <li>explain how a framework calls the <code>setup</code> and <code>compute</code> methods you write</li>
+</ul>
+<p>End of week 1. If you have a spare day, redo any exercise where you opened the solution early, and reread 5.4.</p>
+<label class="done"><input type="checkbox" id="done-5" data-day="5"> I've finished Day 5</label>
+</div>
+</section>

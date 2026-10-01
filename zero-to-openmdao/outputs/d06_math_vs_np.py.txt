@@ -1,0 +1,6 @@
+[0.         0.47942554 0.84147098]
+Traceback (most recent call last):
+  File "d06_math_vs_np.py", line 6, in <module>
+    print(math.sin(angles))    # math only works on single numbers
+          ^^^^^^^^^^^^^^^^
+TypeError: only 0-dimensional arrays can be converted to Python scalars

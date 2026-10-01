@@ -1,0 +1,7 @@
+Traceback (most recent call last):
+  File "d04_crash.py", line 3, in <module>
+    print(atmos.density(-100))
+          ^^^^^^^^^^^^^^^^^^^
+  File "atmos.py", line 11, in density
+    raise ValueError(f"Altitude must not be negative, got {h}")
+ValueError: Altitude must not be negative, got -100

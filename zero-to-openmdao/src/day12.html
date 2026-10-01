@@ -1,0 +1,100 @@
+<section class="day" id="day-12">
+<header class="day-head">
+  <p class="eyebrow">Week 3 · Deeper OpenMDAO, then Dymos</p>
+  <h2><span class="dn">Day 12</span> Vectorized components: the shape of a Dymos ODE</h2>
+  <dl class="meta">
+    <dt>Time</dt><dd>3 hours</dd>
+    <dt>Goal</dt><dd>Write components that compute many points at once, give them efficient (sparse) derivatives, and run a Dymos-style ODE component on its own.</dd>
+  </dl>
+</header>
+
+<div class="warmup">
+  <h3>Warm-up from memory</h3>
+  <ol>
+    <li>What is ∂q/∂v for q = ½ρv²?</li>
+    <li>What does <code>check_partials</code> compare?</li>
+    <li>When must you use <code>method='fd'</code>?</li>
+  </ol>
+  <details class="answer"><summary>Answers</summary>
+    <p>1. ρv. 2. Your derivatives (from <code>compute_partials</code>) against an independent FD or CS calculation. 3. When the component runs something complex step can't pass through, like a simulation or an external program.</p>
+  </details>
+</div>
+
+<h3 id="d12-1"><span class="sec">12.1</span>Why vectorize?</h3>
+<p>So far each input held one number. Dymos needs your physics at <strong>many points in time at once</strong>: these are the <em>nodes</em>. Instead of running the component 60 times, you give every input and output a length of <code>num_nodes</code>, and NumPy computes all of them in one go (Day 6). Three changes turn a component into a vectorized one:</p>
+<ol>
+  <li>an option <code>num_nodes</code> (often shortened to <code>nn</code>)</li>
+  <li>arrays of length <code>nn</code> as starting values, such as <code>val=np.ones(nn)</code></li>
+  <li>derivatives declared as <strong>diagonal</strong> (12.2)</li>
+</ol>
+
+<h3 id="d12-2"><span class="sec">12.2</span>A vectorized component with sparse partials</h3>
+<p>New file <code>d12_vector.py</code>:</p>
+{{code:d12_vector.py}}
+{{out:d12_vector.py}}
+<dl class="lines">
+  <dt><code>self.options.declare('num_nodes', types=int, default=1)</code></dt>
+  <dd>The number of points. <code>types=int</code> makes OpenMDAO reject anything that isn't a whole number.</dd>
+  <dt><code>self.add_input('rho', val=np.ones(nn), …)</code></dt>
+  <dd>Starting value is an array of <code>nn</code> ones, so this input holds <code>nn</code> numbers. (Ones rather than zeros avoid dividing by zero in other components.)</dd>
+  <dt><code>ar = np.arange(nn)</code></dt>
+  <dd><code>[0, 1, 2, 3, 4]</code> for nn = 5.</dd>
+  <dt><code>self.declare_partials('q', 'rho', rows=ar, cols=ar)</code></dt>
+  <dd>Declares which derivative entries are <strong>not zero</strong>. See the picture below.</dd>
+  <dt><code>partials['q', 'v'] = inputs['rho'] * inputs['v']</code></dt>
+  <dd>An array of <code>nn</code> values: one derivative per point, filling the declared diagonal entries.</dd>
+</dl>
+<p>With 5 points, the derivatives of the 5 values of <code>q</code> with respect to the 5 values of <code>v</code> form a 5×5 table (a <strong>Jacobian</strong>). But q at point 3 only depends on v at point 3, so only the diagonal is non-zero:</p>
+<div class="diagram">            v[0]  v[1]  v[2]  v[3]  v[4]
+   q[0]  [   ■     .     .     .     .  ]      ■ = ρ·v at that point
+   q[1]  [   .     ■     .     .     .  ]      . = always zero
+   q[2]  [   .     .     ■     .     .  ]
+   q[3]  [   .     .     .     ■     .  ]      rows = [0,1,2,3,4]
+   q[4]  [   .     .     .     .     ■  ]      cols = [0,1,2,3,4]</div>
+<p><code>rows</code> and <code>cols</code> list the positions of the non-zero entries: (0,0), (1,1), and so on. With 100 nodes that's 100 numbers instead of 10 000. This <strong>sparsity</strong> is what makes Dymos fast.</p>
+
+<h3 id="d12-3"><span class="sec">12.3</span>The easy way: <code>declare_coloring</code></h3>
+<p>Writing <code>rows</code>, <code>cols</code> and <code>compute_partials</code> for every pair is work. One line lets OpenMDAO <em>discover</em> the sparsity itself and compute only the non-zero derivatives with complex step:</p>
+<py>        self.declare_coloring(wrt='*', method='cs')</py>
+<p>It replaces <code>declare_partials('*', '*', method='cs')</code>. It's accurate and much faster than plain cs when there are many nodes. This is what the glider ODE uses. When you later need more speed, switch the important components to analytic partials.</p>
+
+<h3 id="d12-4"><span class="sec">12.4</span>A Dymos ODE, run on its own</h3>
+<p>This is the exact component Dymos will use on Day 15. Dymos isn't involved yet: we just give it 3 states by hand and look at the rates. New file <code>d12_glider_ode.py</code>:</p>
+{{code:d12_glider_ode.py}}
+{{out:d12_glider_ode.py}}
+<p>Everything here you already know:</p>
+<ul>
+  <li><strong>Inputs</strong> are the states (<code>h</code>, <code>v</code>, <code>gamma</code>), the control (<code>alpha</code>) and the parameters (<code>m</code>, <code>S</code>), each with <code>nn</code> values.</li>
+  <li><strong>Outputs</strong> are the rates of change of the states (<code>x_dot</code>, …), plus <code>q</code>, which we want to constrain later.</li>
+  <li><code>compute</code> holds the flat-Earth equations of motion: the same physics as your Day 7 ODE, but vectorized.</li>
+</ul>
+<p>Read the numbers physically. At point 0 the glider is level (γ = 0), so <code>h_dot</code> = 0. At points 1 and 2 it descends at 5°, so <code>h_dot</code> is negative. <code>gamma_dot</code> is positive everywhere, because lift exceeds the weight component and the flight path is curving upward.</p>
+<aside class="callout ok">
+  <p class="callout-h">Connect it to your HGV code</p>
+  <p>Your <code>HGV_ODE</code> from the start of our conversation has exactly this shape: 6 state inputs, 2 control inputs, 6 rate outputs, all of length <code>num_nodes</code>. You can now read every line of it.</p>
+</aside>
+
+<div class="practice">
+<h3>Practice</h3>
+<ol class="ex">
+  <li><p><strong>Vectorized atmosphere with analytic partials.</strong> Write <code>Atmosphere</code> with a <code>num_nodes</code> option, input <code>h</code> and output <code>rho</code>, both of length <code>nn</code>. Use diagonal <code>rows</code>/<code>cols</code> and the analytic derivative ∂ρ/∂h = −(1.225/8500)·e^(−h/8500). Run it at 4 altitudes from 0 to 30 km and check the partials.</p>
+    <details><summary>Show solution</summary>{{code:d12_ex1.py}}{{out:d12_ex1.py}}</details></li>
+  <li><p><strong>Add a load factor output.</strong> Add an output <code>n</code> = L/(m·g) (no units) to <code>GliderODE</code> and print it at the same 3 points. Hypersonic vehicles have g-load limits, and this is how you'd make one available for a constraint.</p>
+    <details><summary>Show solution</summary>{{code:d12_ex2.py}}{{out:d12_ex2.py}}<p>Because this component computes its own derivatives with complex step, there's nothing to check with <code>check_partials</code>. That tool is for derivatives you write yourself.</p></details></li>
+  <li><p><strong>Five points.</strong> Change <code>nn</code> to 5 in <code>d12_glider_ode.py</code> and supply 5 values for every input. What error do you get if one input still has only 3 values?</p>
+    <details><summary>Show answer</summary><p>OpenMDAO refuses with <code>ValueError: Failed to set value of 'v': cannot reshape array of size 3 into shape (5,).</code> The number of values must match the input's shape. That's a useful safety check.</p></details></li>
+</ol>
+</div>
+
+<div class="checkpoint">
+<h3>Checkpoint</h3>
+<p>You can now:</p>
+<ul>
+  <li>write a component with a <code>num_nodes</code> option and array inputs and outputs</li>
+  <li>explain why a vectorized component's Jacobian is diagonal, and declare it with <code>rows</code>/<code>cols</code></li>
+  <li>use <code>declare_coloring(wrt='*', method='cs')</code> as the easy alternative</li>
+  <li>read a Dymos-style ODE component: states, controls and parameters in, rates out</li>
+</ul>
+<label class="done"><input type="checkbox" id="done-12" data-day="12"> I've finished Day 12</label>
+</div>
+</section>

@@ -1,0 +1,2 @@
+[1.225      0.37774733 0.11648412 0.03591964]
+Derivative check finished. Any wrong derivatives are listed above.

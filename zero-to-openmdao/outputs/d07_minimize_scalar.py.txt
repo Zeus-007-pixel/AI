@@ -1,0 +1,3 @@
+True
+Best angle: 40.92 deg
+Best range: 600.8 m

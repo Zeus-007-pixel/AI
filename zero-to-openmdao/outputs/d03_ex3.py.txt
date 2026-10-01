@@ -1,0 +1,3 @@
+v0 =  50.0 m/s: best angle 44 deg, range 214.0 m
+v0 = 100.0 m/s: best angle 41 deg, range 600.9 m
+v0 = 200.0 m/s: best angle 36 deg, range 1224.2 m

@@ -1,0 +1,24 @@
+Optimization terminated successfully    (Exit mode 0)
+            Current function value: 3.0917698435853356
+            Iterations: 17
+            Function evaluations: 36
+            Gradient evaluations: 16
+Optimization Complete
+-----------------------------------
+h =  0.0 km: slowest speed 30.92 m/s
+Optimization terminated successfully    (Exit mode 0)
+            Current function value: 4.148975095971489
+            Iterations: 15
+            Function evaluations: 14
+            Gradient evaluations: 14
+Optimization Complete
+-----------------------------------
+h =  5.0 km: slowest speed 41.49 m/s
+Optimization terminated successfully    (Exit mode 0)
+            Current function value: 5.567682983176592
+            Iterations: 12
+            Function evaluations: 12
+            Gradient evaluations: 12
+Optimization Complete
+-----------------------------------
+h = 10.0 km: slowest speed 55.68 m/s

@@ -1,0 +1,4 @@
+v =  40.0 m/s -> trim alpha =  7.169 deg
+v =  50.0 m/s -> trim alpha =  4.588 deg
+v =  80.0 m/s -> trim alpha =  1.792 deg
+v = 120.0 m/s -> trim alpha =  0.797 deg

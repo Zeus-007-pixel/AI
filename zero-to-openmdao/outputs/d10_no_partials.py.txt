@@ -1,0 +1,14 @@
+.../site-packages/openmdao/core/group.py:1197: DerivativesWarning:Constraints or objectives [parab.f] cannot be impacted by the design variables of the problem because no partials were defined for them in their parent component(s).
+.../site-packages/openmdao/core/driver.py:1454: DriverWarning:ScipyOptimizeDriver: objective(s) ['f'] do not depend on any design variables. Please check your problem formulation.
+.../site-packages/openmdao/core/total_jac.py:1925: DerivativesWarning:The following constraints or objectives cannot be impacted by the design variables of the problem at the current design point:
+  f, inds=[0]
+
+Optimization terminated successfully    (Exit mode 0)
+            Current function value: -14.75
+            Iterations: 2
+            Function evaluations: 2
+            Gradient evaluations: 2
+Optimization Complete
+-----------------------------------
+Success: True
+x = [3.5] y = [-3.5] f = [-14.75]

@@ -1,0 +1,106 @@
+<section class="day" id="day-13">
+<header class="day-head">
+  <p class="eyebrow">Week 3 · Deeper OpenMDAO, then Dymos</p>
+  <h2><span class="dn">Day 13</span> Implicit components and solvers <span class="optional-tag">optional</span></h2>
+  <dl class="meta">
+    <dt>Time</dt><dd>3 hours</dd>
+    <dt>Goal</dt><dd>Solve equations inside a model ("find α so that lift = weight") with implicit components, Newton's method and BalanceComp. Skip this day on the two-week plan and come back to it later.</dd>
+  </dl>
+</header>
+
+<div class="warmup">
+  <h3>Warm-up from memory</h3>
+  <ol>
+    <li>For <code>nn = 4</code>, what do <code>rows=np.arange(4), cols=np.arange(4)</code> describe?</li>
+    <li>What does the <code>num_nodes</code> option control?</li>
+    <li>What does <code>declare_coloring(wrt='*', method='cs')</code> do?</li>
+  </ol>
+  <details class="answer"><summary>Answers</summary>
+    <p>1. A diagonal Jacobian: output i depends only on input i. 2. How many points every input and output holds. 3. OpenMDAO finds which derivatives are non-zero and computes only those, with complex step.</p>
+  </details>
+</div>
+
+<h3 id="d13-1"><span class="sec">13.1</span>Explicit vs implicit</h3>
+<p>Every component so far was <strong>explicit</strong>: output = formula(inputs). Some questions can't be written that way. "Which angle of attack makes lift exactly equal to weight?" is a condition the answer must satisfy, not a formula that produces it.</p>
+<p>An <strong>implicit</strong> component describes its output with a <strong>residual</strong>, a quantity that must become zero when the output is right:</p>
+<p style="text-align:center"><strong>R(α) = L(α) − W = 0</strong></p>
+<p>A <strong>solver</strong> then searches for the α that makes R zero. It's like the optimizer's search, but finding a zero instead of a minimum.</p>
+
+<h3 id="d13-2"><span class="sec">13.2</span>An ImplicitComponent and Newton's method</h3>
+<p>This uses <code>FlightCondition</code> from <code>flight_components.py</code> (Day 9). New file <code>d13_implicit.py</code>:</p>
+{{code:d13_implicit.py}}
+{{out:d13_implicit.py}}
+<dl class="lines">
+  <dt><code>class LiftEqualsWeight(om.ImplicitComponent):</code></dt>
+  <dd>Inherit from <code>ImplicitComponent</code> instead of <code>ExplicitComponent</code>.</dd>
+  <dt><code>self.add_output('alpha', val=0.05, units='rad')</code></dt>
+  <dd>The unknown is an <em>output</em> of this component. <code>val=0.05</code> is the solver's starting guess.</dd>
+  <dt><code>def apply_nonlinear(self, inputs, outputs, residuals):</code></dt>
+  <dd>Instead of <code>compute</code>, an implicit component provides this method. It doesn't calculate the output; it says how far from correct the current output is.</dd>
+  <dt><code>residuals['alpha'] = inputs['L'] - inputs['W']</code></dt>
+  <dd>The residual belonging to output <code>alpha</code>. It's zero exactly when lift equals weight.</dd>
+  <dt>The loop in the model</dt>
+  <dd><code>trim</code> outputs <code>alpha</code> → <code>aero</code> uses it to compute <code>L</code> → <code>trim</code> needs <code>L</code>. That's a <strong>feedback loop</strong>, so running each block once in order can't solve it.</dd>
+  <dt><code>model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True, maxiter=20, iprint=2)</code></dt>
+  <dd><strong>Newton's method</strong>: guess α, measure the residual, use its derivative to jump to a better guess, and repeat until the residual is zero. <code>maxiter</code> limits the attempts, and <code>iprint=2</code> prints each iteration. <code>solve_subsystems=True</code> makes Newton run the ordinary components first at each step, so L is up to date.</dd>
+  <dt><code>model.linear_solver = om.DirectSolver()</code></dt>
+  <dd>Newton needs to solve a small linear-algebra problem at each step. <code>DirectSolver</code> does that exactly.</dd>
+</dl>
+<p>The printout <code>NL: Newton 0 ; 1842.5 1</code> means: at iteration 0 the residual is 1842.5 N. After one step it's 0 and it has converged. (One step is enough because L is a straight-line function of α here.)</p>
+<aside class="callout warn">
+  <p class="callout-h">Common error: "Singular entry found"</p>
+  <p>With <code>solve_subsystems=False</code>, the same model fails with <code>RuntimeError: Singular entry found in &lt;model&gt; … for column associated with state/residual 'alpha'</code>. Newton looked at the derivatives before the explicit components had run, when q was still at its starting value of 0. With q = 0, changing α seems to change nothing, so Newton can't decide which way to move. "Singular" means "some unknown seems to have no effect". Check that everything has been computed and that no starting value is zero where it matters.</p>
+</aside>
+
+<h3 id="d13-3"><span class="sec">13.3</span>The ready-made version: <code>BalanceComp</code></h3>
+<p>"Adjust X until A equals B" is so common that OpenMDAO has a component for it. New file <code>d13_balance.py</code>:</p>
+{{code:d13_balance.py}}
+{{out:d13_balance.py}}
+<dl class="lines">
+  <dt><code>bal = om.BalanceComp()</code></dt>
+  <dd>Create the component first, then configure it.</dd>
+  <dt><code>bal.add_balance('alpha', units='rad', val=0.05, lhs_name='L', rhs_name='W', eq_units='N')</code></dt>
+  <dd>"Create an output <code>alpha</code> and adjust it until input <code>L</code> (left-hand side) equals input <code>W</code> (right-hand side)." <code>eq_units</code> are the units of L and W.</dd>
+  <dt><code>iprint=0</code></dt>
+  <dd>Quiet: don't print the Newton iterations.</dd>
+  <dt>The loop over speeds</dt>
+  <dd>Each <code>run_model()</code> solves the equation again. Faster flight needs less angle of attack.</dd>
+</dl>
+<p>Hand check: α = W / (q·S·C<sub>Lα</sub>). New file <code>d13_ex1.py</code>:</p>
+{{code:d13_ex1.py}}
+{{out:d13_ex1.py}}
+<p>Identical. When you can, check a solver's answer against a hand calculation like this.</p>
+
+<h3 id="d13-4"><span class="sec">13.4</span>Where you'll meet this again</h3>
+<p>Coupled systems are everywhere in multidisciplinary design. Aerodynamics changes the structure's shape, and the shape changes the aerodynamics. OpenMDAO's documentation has a classic two-discipline example called the <em>Sellar problem</em>, which uses a solver called <code>NonlinearBlockGS</code>: worth reading after this course. Dymos uses these same solvers in some of its settings.</p>
+
+<div class="practice">
+<h3>Practice</h3>
+<ol class="ex">
+  <li><p><strong>Hand check.</strong> Run <code>d13_ex1.py</code> from 13.3 and confirm it matches <code>d13_balance.py</code> at every speed. Then change the mass to 1000 kg (W = 9810 N) in both and compare again.</p>
+    <details><summary>Show answer</summary><p>Both double their α, because α is proportional to W in this model.</p></details></li>
+  <li><p><strong>Trim at altitude.</strong> At a fixed 50 m/s, find the trim angle at 0, 5 and 10 km using <code>BalanceComp</code>.</p>
+    <details><summary>Show solution</summary>{{code:d13_ex2.py}}{{out:d13_ex2.py}}<p>Thinner air needs much more angle of attack. At 10 km, 14.9° would be past the stall of a real wing. Combine this with Day 10: the slowest speed at 10 km was 55.7 m/s.</p></details></li>
+  <li><p><strong>Watch Newton work.</strong> In <code>flight_components.py</code>, <em>temporarily</em> change the lift line in <code>Aero</code> to something curved: <code>CL = self.options['CLa'] * np.sin(inputs['alpha'])</code>. Run <code>d13_implicit.py</code> (it has <code>iprint=2</code>). How many iterations does Newton need now? Change the line back afterwards.</p>
+    <details><summary>Show answer</summary><txt>NL: Newton 0 ; 1843.77588 1
+NL: Newton 1 ; 1.66948823 0.00090547243
+NL: Newton 2 ; 1.83339944e-06 9.94372177e-10
+NL: Newton 3 ; 9.09494702e-13 4.93278337e-16
+NL: Newton Converged
+Trim angle of attack: 4.593 deg</txt><p>Three iterations. The residual goes 1844 → 1.7 → 0.0000018 → practically 0, and the number of correct digits roughly doubles each step. That rapid shrinking is the signature of Newton's method.</p></details></li>
+</ol>
+</div>
+
+<div class="checkpoint">
+<h3>Checkpoint</h3>
+<p>You can now:</p>
+<ul>
+  <li>explain explicit vs implicit, and what a residual is</li>
+  <li>write an <code>ImplicitComponent</code> with <code>apply_nonlinear</code></li>
+  <li>set up <code>NewtonSolver</code> with <code>DirectSolver</code> for a model with a feedback loop</li>
+  <li>use <code>BalanceComp</code> for "adjust X until A = B"</li>
+  <li>recognise the "singular" error and what causes it</li>
+</ul>
+<label class="done"><input type="checkbox" id="done-13" data-day="13"> I've finished Day 13</label>
+</div>
+</section>

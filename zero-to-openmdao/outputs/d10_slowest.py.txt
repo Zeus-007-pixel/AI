@@ -1,0 +1,11 @@
+Optimization terminated successfully    (Exit mode 0)
+            Current function value: 3.0917698435853356
+            Iterations: 17
+            Function evaluations: 36
+            Gradient evaluations: 16
+Optimization Complete
+-----------------------------------
+Success: True
+Slowest speed: 30.92 m/s
+Angle of attack: 12.00 deg
+Lift minus weight: 0.000 N

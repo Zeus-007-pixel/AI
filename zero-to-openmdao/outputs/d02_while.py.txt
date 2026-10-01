@@ -1,0 +1,2 @@
+The ball lands after about 6.13 s
+Exact answer from physics: 6.12 s

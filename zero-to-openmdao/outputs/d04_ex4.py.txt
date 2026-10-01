@@ -1,0 +1,4 @@
+leg: 120.5 running total: 120.5
+leg: 98.0 running total: 218.5
+leg: 143.2 running total: 361.7
+Total distance: 361.7 km

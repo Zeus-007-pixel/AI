@@ -1,0 +1,6 @@
+2000000000.0
+Traceback (most recent call last):
+  File "d03_scope.py", line 8, in <module>
+    print(energy)                     # error: 'energy' does not exist out here
+          ^^^^^^
+NameError: name 'energy' is not defined

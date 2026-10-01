@@ -1,0 +1,9 @@
+Optimization terminated successfully    (Exit mode 0)
+            Current function value: -27.33333333333333
+            Iterations: 3
+            Function evaluations: 4
+            Gradient evaluations: 3
+Optimization Complete
+-----------------------------------
+5 iterations recorded
+first f = 2782.00, last f = -27.3333

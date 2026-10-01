@@ -1,0 +1,36 @@
+
+Coloring for 'traj.phases.glide.rhs_all' (class GliderODE)
+
+Jacobian shape: (300, 360)  (1.00% nonzero)
+FWD solves: 6   REV solves: 0
+Total colors vs. total size: 6 vs 360  (98.33% improvement)
+
+Sparsity computed using tolerance: 1e-25.
+Dense partial jacobian for GliderODE 'traj.phases.glide.rhs_all' was computed 3 times.
+Time to compute sparsity:   0.0453 sec
+Time to compute coloring:   0.0194 sec
+
+Jacobian shape: (330, 226)  (2.27% nonzero)
+FWD solves: 13   REV solves: 0
+Total colors vs. total size: 13 vs 226  (94.25% improvement)
+
+Sparsity computed using tolerance: 1e-25.
+Dense total jacobian for Problem 'd15_ex1' was computed 3 times.
+Time to compute sparsity:   0.4323 sec
+Time to compute coloring:   0.1962 sec
+Coloring created on: 2026-10-01 08:36:17
+.../site-packages/openmdao/core/total_jac.py:1925: DerivativesWarning:The following constraints or objectives cannot be impacted by the design variables of the problem at the current design point:
+  traj.glide.q[path], inds=[(0, 0)]
+
+Optimization terminated successfully    (Exit mode 0)
+            Current function value: -6.088421478645126
+            Iterations: 78
+            Function evaluations: 112
+            Gradient evaluations: 78
+Optimization Complete
+-----------------------------------
+
+Simulating trajectory traj
+Done simulating trajectory traj
+flight time 889.0 s, range 60.88 km, final h 0.0000 km
+alpha between 4.05 and 15.00 deg

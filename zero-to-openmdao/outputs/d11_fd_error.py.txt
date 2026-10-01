@@ -1,0 +1,4 @@
+h = 1e-01   FD error = 4.3e-02   CS error = 9.0e-04
+h = 1e-04   FD error = 4.2e-05   CS error = 9.0e-10
+h = 1e-08   FD error = 3.0e-09   CS error = 1.1e-16
+h = 1e-12   FD error = 4.3e-05   CS error = 0.0e+00

@@ -1,0 +1,2 @@
+Density drops below 0.001 kg/m^3 at 61 km
+40 of the 101 altitudes are that thin

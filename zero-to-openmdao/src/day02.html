@@ -1,0 +1,176 @@
+<section class="day" id="day-2">
+<header class="day-head">
+  <p class="eyebrow">Week 1 · Python foundations</p>
+  <h2><span class="dn">Day 2</span> Decisions, lists and loops</h2>
+  <dl class="meta">
+    <dt>Time</dt><dd>3–4 hours</dd>
+    <dt>Goal</dt><dd>Make your program choose between options, store many values in a list, repeat work with loops, and write your first flight simulation.</dd>
+  </dl>
+</header>
+
+<div class="warmup">
+  <h3>Warm-up from memory</h3>
+  <p>Answer in your head or on paper first, then open the answers.</p>
+  <ol>
+    <li>What does <code>x = x + 1</code> do?</li>
+    <li>What does <code>print(f"{3.14159:.2f}")</code> show?</li>
+    <li>What's the difference between <code>7 / 2</code> and <code>7 // 2</code>?</li>
+  </ol>
+  <details class="answer"><summary>Answers</summary>
+    <p>1. It takes the current value of <code>x</code>, adds 1, and stores the result back in <code>x</code>. 2. <code>3.14</code>. 3. <code>7 / 2</code> is <code>3.5</code>; <code>7 // 2</code> drops the decimals and gives <code>3</code>.</p>
+  </details>
+</div>
+
+<h3 id="d2-1"><span class="sec">2.1</span>True and False: comparing values</h3>
+<p>Programs make decisions by asking yes/no questions. In Python, a question gives a <strong>boolean</strong>: <code>True</code> or <code>False</code>. New file <code>d02_compare.py</code>:</p>
+{{code:d02_compare.py}}
+{{out:d02_compare.py}}
+<div class="table-wrap"><table>
+  <thead><tr><th>Write</th><th>Means</th></tr></thead>
+  <tbody>
+    <tr><td><code>a &gt; b</code>, <code>a &lt; b</code></td><td>greater than, less than</td></tr>
+    <tr><td><code>a &gt;= b</code>, <code>a &lt;= b</code></td><td>greater than or equal, less than or equal</td></tr>
+    <tr><td><code>a == b</code></td><td>equal to (<strong>two</strong> equals signs)</td></tr>
+    <tr><td><code>a != b</code></td><td>not equal to</td></tr>
+    <tr><td><code>x and y</code></td><td><code>True</code> only if both are <code>True</code></td></tr>
+    <tr><td><code>x or y</code></td><td><code>True</code> if at least one is <code>True</code></td></tr>
+    <tr><td><code>not x</code></td><td>flips <code>True</code> and <code>False</code></td></tr>
+  </tbody>
+</table></div>
+<aside class="callout warn">
+  <p class="callout-h">Common error: = vs ==</p>
+  <p>One <code>=</code> <em>stores</em> a value. Two <code>==</code> <em>asks</em> whether two values are equal. Writing <code>if mach = 5:</code> is a <code>SyntaxError</code>.</p>
+</aside>
+
+<h3 id="d2-2"><span class="sec">2.2</span>Making decisions with <code>if</code>, <code>elif</code>, <code>else</code></h3>
+<p>New file <code>d02_if.py</code>. It sorts a Mach number into a flight regime:</p>
+{{code:d02_if.py}}
+{{out:d02_if.py}}
+<dl class="lines">
+  <dt><code>if mach &lt; 0.8:</code></dt>
+  <dd>"If this is <code>True</code>, run the indented lines below me." The line <strong>must end with a colon</strong> <code>:</code>.</dd>
+  <dt><code>    regime = "subsonic"</code></dt>
+  <dd>This line is <strong>indented</strong> (pushed right by 4 spaces), which means it belongs to the <code>if</code>. It only runs when the question was <code>True</code>.</dd>
+  <dt><code>elif mach &lt; 1.2:</code></dt>
+  <dd>"else if": checked only if every question above it was <code>False</code>. You can have as many <code>elif</code> lines as you need.</dd>
+  <dt><code>else:</code></dt>
+  <dd>Runs if none of the questions above were <code>True</code>. It's optional.</dd>
+  <dt><code>print(...)</code> (not indented)</dt>
+  <dd>Back at the left edge, so it isn't part of the <code>if</code>. It always runs, after the decision is made.</dd>
+</dl>
+<p>Python checks from top to bottom and runs <strong>only the first branch that is <code>True</code></strong>. Mach 6.2 fails <code>&lt; 0.8</code>, <code>&lt; 1.2</code> and <code>&lt; 5</code>, so it lands in <code>else</code>.</p>
+<aside class="callout note">
+  <p class="callout-h">Indentation is part of the language</p>
+  <p>In Python, the spaces at the start of a line decide which lines belong together, a bit like sub-bullets in a list. The standard is <strong>4 spaces</strong>. VS Code inserts 4 spaces when you press <kbd>Tab</kbd> and indents automatically after a colon. If the spacing is inconsistent, Python stops with an <code>IndentationError</code>.</p>
+</aside>
+
+<h3 id="d2-3"><span class="sec">2.3</span>Lists: many values under one name</h3>
+<p>A <strong>list</strong> holds several values in order, inside square brackets and separated by commas. New file <code>d02_lists.py</code>:</p>
+{{code:d02_lists.py}}
+{{out:d02_lists.py}}
+<p>Each item has a position number called an <strong>index</strong>. <strong>Counting starts at 0, not 1.</strong> Negative numbers count from the end:</p>
+<div class="diagram">value:            0     10     20     30     40
+index:            0      1      2      3      4
+negative index:  -5     -4     -3     -2     -1</div>
+<dl class="lines">
+  <dt><code>altitudes_km[0]</code></dt><dd>The item at index 0, which is the first one.</dd>
+  <dt><code>altitudes_km[-1]</code></dt><dd>The last item. This works whatever the list's length.</dd>
+  <dt><code>altitudes_km[1:3]</code></dt><dd>A <strong>slice</strong>: items from index 1 up to <em>but not including</em> index 3, so indexes 1 and 2.</dd>
+  <dt><code>len(altitudes_km)</code></dt><dd>How many items the list holds.</dd>
+  <dt><code>altitudes_km.append(50)</code></dt><dd>Adds 50 to the end. <code>.append</code> is a function that belongs to lists (the dot again means "belonging to").</dd>
+  <dt><code>altitudes_km[0] = 5</code></dt><dd>Replaces the item at index 0.</dd>
+  <dt><code>sum(...)</code>, <code>min(...)</code>, <code>max(...)</code></dt><dd>Built-in functions for the total, the smallest and the largest value.</dd>
+</dl>
+<aside class="callout warn">
+  <p class="callout-h">Common error: IndexError</p>
+  <p>A list with 5 items has indexes 0 to 4. Asking for <code>altitudes_km[5]</code> gives <code>IndexError: list index out of range</code>.</p>
+</aside>
+
+<h3 id="d2-4"><span class="sec">2.4</span>Repeating work with a <code>for</code> loop</h3>
+<p>A <strong>loop</strong> runs the same lines several times. A <code>for</code> loop runs them once for each item in a list. New file <code>d02_for.py</code>:</p>
+{{code:d02_for.py}}
+{{out:d02_for.py}}
+<dl class="lines">
+  <dt><code>for h_km in altitudes_km:</code></dt>
+  <dd>"For each item in <code>altitudes_km</code>, put that item in the variable <code>h_km</code> and run the indented lines." The first time <code>h_km</code> is 0, the second time 10, and so on. You choose the name <code>h_km</code>; it can be anything.</dd>
+  <dt>The 3 indented lines</dt>
+  <dd>Run once per item. One pass through these lines is called an <strong>iteration</strong>.</dd>
+  <dt><code>rho = 1.225 * math.exp(-h / 8500)</code></dt>
+  <dd>A simple atmosphere model: density is 1.225 kg/m³ at sea level and falls by a factor e ≈ 2.72 every 8.5 km.</dd>
+  <dt><code>print("Done")</code></dt>
+  <dd>Not indented, so it runs once, after the loop has finished.</dd>
+</dl>
+
+<h3 id="d2-5"><span class="sec">2.5</span><code>range</code>: counting without typing a list</h3>
+<p><code>range</code> produces a sequence of whole numbers for a loop to step through. New file <code>d02_range.py</code>:</p>
+{{code:d02_range.py}}
+{{out:d02_range.py}}
+<ul>
+  <li><code>range(5)</code> gives 0, 1, 2, 3, 4: five numbers, starting at 0 and stopping <em>before</em> 5.</li>
+  <li><code>range(2, 6)</code> gives start 2, stop before 6.</li>
+  <li><code>range(0, 50, 10)</code> gives start 0, stop before 50, in steps of 10.</li>
+  <li><code>list(range(...))</code> turns the range into a list so you can print and see it.</li>
+</ul>
+
+<h3 id="d2-6"><span class="sec">2.6</span>Building a list inside a loop</h3>
+<p>A pattern you'll use all the time: start with an empty list, loop, and <code>append</code> one result per iteration. New file <code>d02_build_list.py</code>:</p>
+{{code:d02_build_list.py}}
+{{out:d02_build_list.py}}
+<p><code>densities = []</code> makes an empty list. Each pass adds one value, so after 5 passes it holds 5 values.</p>
+
+<h3 id="d2-7"><span class="sec">2.7</span><code>while</code> loops and your first simulation</h3>
+<p>A <code>while</code> loop keeps repeating <strong>as long as a condition is <code>True</code></strong>. That's exactly what a simulation needs: "keep stepping time forward while the ball is still in the air."</p>
+<p>The idea is called <strong>Euler's method</strong>, and it's the heart of every flight simulation. Over a small time step <code>dt</code>:</p>
+<ul>
+  <li>new height = old height + vertical speed × dt</li>
+  <li>new speed = old speed + acceleration × dt</li>
+</ul>
+<p>The numbers that describe the ball at one instant (height and speed) are called its <strong>state</strong>. How fast they change (speed and acceleration) are its <strong>rates</strong>. Remember those two words: OpenMDAO and Dymos use them too. New file <code>d02_while.py</code>:</p>
+{{code:d02_while.py}}
+{{out:d02_while.py}}
+<dl class="lines">
+  <dt>First 5 lines</dt><dd>Gravity, plus the starting state (height 0, upward speed 30 m/s), the clock (t = 0) and the time step (0.01 s).</dd>
+  <dt><code>while h &gt;= 0:</code></dt><dd>Check the condition. If the height is still 0 or more, run the indented block, then come back and check again. Stop when it becomes <code>False</code>.</dd>
+  <dt><code>h = h + v * dt</code></dt><dd>Move the ball by speed × time step.</dd>
+  <dt><code>v = v - g * dt</code></dt><dd>Gravity reduces the upward speed by g × time step.</dd>
+  <dt><code>t = t + dt</code></dt><dd>Advance the clock.</dd>
+</dl>
+<p>The simulation gives 6.13 s and the exact answer is 6.12 s. The small difference comes from the finite time step. Make <code>dt</code> 10 times smaller and the answer gets closer, but the loop runs 10 times more often.</p>
+<aside class="callout warn">
+  <p class="callout-h">Infinite loops</p>
+  <p>If the condition never becomes <code>False</code> (for example you forgot to update <code>h</code>), the loop runs forever. Click in the terminal and press <kbd>Ctrl</kbd>+<kbd>C</kbd> to stop it.</p>
+</aside>
+
+<h3 id="d2-8"><span class="sec">2.8</span>Leaving a loop early with <code>break</code></h3>
+<p><code>break</code> jumps out of the loop immediately. New file <code>d02_break.py</code> finds the first altitude where the air is thinner than 0.01 kg/m³:</p>
+{{code:d02_break.py}}
+{{out:d02_break.py}}
+<p>Notice the <code>if</code> inside the <code>for</code>: its lines are indented twice (8 spaces), because they belong to the <code>if</code>, which belongs to the loop.</p>
+
+<div class="practice">
+<h3>Practice</h3>
+<ol class="ex">
+  <li><p><strong>Classify many Mach numbers.</strong> Given <code>mach_numbers = [0.5, 0.95, 2.0, 7.5]</code>, loop over the list and print each Mach number with its regime, using the same rules as 2.2.</p>
+    <details><summary>Show solution</summary>{{code:d02_ex1.py}}{{out:d02_ex1.py}}</details></li>
+  <li><p><strong>Density table and the 1% altitude.</strong> Print the density every 10 km from 0 to 80 km, collecting the values in a list. Then use a second loop in 1 km steps with <code>break</code> to find the first altitude where density falls below 1% of sea level (0.01 × 1.225).</p>
+    <details><summary>Show solution</summary>{{code:d02_ex2.py}}{{out:d02_ex2.py}}<p><code>{h_km:2d}</code> pads the number to 2 characters so the column lines up.</p></details></li>
+  <li><p><strong>A cannonball without air.</strong> Simulate a shot at 100 m/s and 45° using Euler steps of 0.001 s. The state is <code>x, y, vx, vy</code>. Gravity only changes <code>vy</code>. Track the highest point. Compare your range with the textbook formula v²/g, and your peak height with v²/(4g).<br>Hint: <code>vx = v0 * math.cos(angle)</code>, and convert degrees with <code>math.radians</code>.</p>
+    <details><summary>Show solution</summary>{{code:d02_ex3.py}}{{out:d02_ex3.py}}</details></li>
+  <li><p><strong>Add drag.</strong> Take exercise 3 and add air drag. Each step, compute <code>speed = math.sqrt(vx**2 + vy**2)</code>. The drag accelerations are <code>ax = -k * speed * vx</code> and <code>ay = -g - k * speed * vy</code>, with <code>k = 0.001</code> per metre. How much range do you lose?</p>
+    <details><summary>Show solution</summary>{{code:d02_ex4.py}}{{out:d02_ex4.py}}<p>Drag cuts the range from about 1019 m to 596 m. Keep this number in mind: on Day 7 a professional solver gets the same answer.</p></details></li>
+</ol>
+</div>
+
+<div class="checkpoint">
+<h3>Checkpoint</h3>
+<p>You can now:</p>
+<ul>
+  <li>write comparisons and combine them with <code>and</code>, <code>or</code> and <code>not</code></li>
+  <li>write <code>if</code> / <code>elif</code> / <code>else</code> with correct colons and indentation</li>
+  <li>create lists, index from 0, slice, and <code>append</code></li>
+  <li>loop with <code>for … in …</code>, <code>range</code> and <code>while</code>, and leave early with <code>break</code></li>
+  <li>explain Euler's method: new state = old state + rate × time step</li>
+</ul>
+<label class="done"><input type="checkbox" id="done-2" data-day="2"> I've finished Day 2</label>
+</div>
+</section>

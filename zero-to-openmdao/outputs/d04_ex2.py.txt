@@ -1,0 +1,4 @@
+1000 m: 1.0890 kg/m^3
+12000 m: 0.2985 kg/m^3
+25000 m: 0.0647 kg/m^3
+Skipped 2 bad altitudes

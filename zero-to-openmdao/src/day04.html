@@ -1,0 +1,154 @@
+<section class="day" id="day-4">
+<header class="day-head">
+  <p class="eyebrow">Week 1 · Python foundations</p>
+  <h2><span class="dn">Day 4</span> Modules, errors, files and debugging</h2>
+  <dl class="meta">
+    <dt>Time</dt><dd>3–4 hours</dd>
+    <dt>Goal</dt><dd>Split code across files, stop bad inputs with clear errors, read and write data files, and find bugs with prints and the debugger.</dd>
+  </dl>
+</header>
+
+<div class="warmup">
+  <h3>Warm-up from memory</h3>
+  <ol>
+    <li>What does <code>return</code> do that <code>print</code> doesn't?</li>
+    <li>With <code>def f(a, b=2): return a * b</code>, what are <code>f(3)</code>, <code>f(3, 4)</code> and <code>f(b=5, a=1)</code>?</li>
+    <li>With <code>vehicle = {"mass": 500}</code>, how do you add a key <code>"S"</code> with value 10?</li>
+  </ol>
+  <details class="answer"><summary>Answers</summary>
+    <p>1. It hands the value back to the caller so it can be stored and used. <code>print</code> only displays it. 2. <code>6</code>, <code>12</code> and <code>5</code>. 3. <code>vehicle["S"] = 10</code>.</p>
+  </details>
+</div>
+
+<h3 id="d4-1"><span class="sec">4.1</span>Your own module: a file of tools</h3>
+<p>As programs grow, one file gets messy. Any <code>.py</code> file can be used as a <strong>module</strong>: another file can <code>import</code> it and use its functions. Make <code>atmos.py</code> (no <code>d04_</code> prefix, because other files will import it by this name):</p>
+{{code:atmos.py}}
+{{out:atmos.py|label=Output when you run atmos.py itself}}
+<dl class="lines">
+  <dt><code>RHO0 = 1.225</code></dt>
+  <dd>A fixed value used by the functions. By convention, names in CAPITALS mean "a constant: don't change this".</dd>
+  <dt><code>if h &lt; 0: raise ValueError(...)</code></dt>
+  <dd>Stops the program with a clear message if someone asks for a negative altitude. Explained in 4.3.</dd>
+  <dt><code>if __name__ == "__main__":</code></dt>
+  <dd>Two underscores on each side. In plain words: "run the block below <strong>only when this file is run directly</strong>, and skip it when another file imports it". It's the place for quick tests of the module.</dd>
+</dl>
+<p>Now make <code>d04_main.py</code> <strong>in the same folder</strong>:</p>
+{{code:d04_main.py}}
+{{out:d04_main.py}}
+<dl class="lines">
+  <dt><code>import atmos</code></dt>
+  <dd>Python looks for <code>atmos.py</code> in the same folder and loads it. Notice the test block did <em>not</em> run this time.</dd>
+  <dt><code>atmos.density(10000)</code></dt>
+  <dd>Use a function from the module: <code>module.function</code>.</dd>
+  <dt><code>from atmos import temperature</code></dt>
+  <dd>Pulls one name straight in, so you can write <code>temperature(…)</code> without the <code>atmos.</code> prefix.</dd>
+</dl>
+<aside class="callout note">
+  <p class="callout-h">Why 223.14999999999998?</p>
+  <p>Computers store decimals in binary, so some values like 223.15 can't be stored exactly and tiny rounding errors appear. This is normal in every language. Use f-strings (<code>{T:.2f}</code>) when you display numbers.</p>
+</aside>
+
+<h3 id="d4-2"><span class="sec">4.2</span>Libraries are just other people's modules</h3>
+<p>NumPy, SciPy and OpenMDAO are big collections of modules that <code>pip</code> installed for you on Day 1. You import them the same way. Often you give them a short nickname with <code>as</code>:</p>
+<py>import numpy as np               # now write np.sin instead of numpy.sin
+import openmdao.api as om       # the OpenMDAO tools you need live in openmdao.api
+from scipy.integrate import solve_ivp</py>
+<p>To see what's installed, run <code>python -m pip list</code> in the terminal. Each library has online documentation. Search "numpy linspace" and the official page is usually the first result.</p>
+
+<h3 id="d4-3"><span class="sec">4.3</span>Raising errors on purpose</h3>
+<p>A wrong answer that looks fine is worse than a crash. <code>raise ValueError("message")</code> stops the program and says why. Make <code>d04_crash.py</code>:</p>
+{{code:d04_crash.py}}
+{{out:d04_crash.py|label=Output (an error, on purpose)}}
+<p>This traceback goes through <strong>two files</strong>. Read it from the bottom:</p>
+<ol>
+  <li>The last line says what happened: <code>ValueError: Altitude must not be negative, got -100</code>.</li>
+  <li>Just above, it shows where it was raised: <code>atmos.py</code>, line 11, inside <code>density</code>.</li>
+  <li>Above that, it shows who called it: <code>d04_crash.py</code>, line 3.</li>
+</ol>
+<p>So a traceback is a chain: the top is where your program started, and the bottom is where it broke. The fix is usually in <em>your</em> file (here: don't pass a negative altitude), even when the error is raised inside a library.</p>
+
+<h3 id="d4-4"><span class="sec">4.4</span>Catching errors with <code>try</code> / <code>except</code></h3>
+<p>Sometimes you expect an error and want to deal with it instead of crashing. Make <code>d04_errors.py</code>:</p>
+{{code:d04_errors.py}}
+{{out:d04_errors.py}}
+<dl class="lines">
+  <dt><code>try:</code></dt><dd>"Try to run the indented lines."</dd>
+  <dt><code>except ValueError as err:</code></dt><dd>"If a <code>ValueError</code> happens, don't crash. Run this block instead." <code>as err</code> stores the error so you can print its message.</dd>
+</dl>
+<p>Only catch errors you expect and know how to handle. Wrapping everything in <code>try</code> hides real bugs.</p>
+
+<h3 id="d4-5"><span class="sec">4.5</span>Writing and reading files</h3>
+<p>Results should be saved to files so you can open them in Excel or plot them later. <strong>CSV</strong> ("comma-separated values") is a plain text table: one row per line, with columns separated by commas. Make <code>d04_write_file.py</code>:</p>
+{{code:d04_write_file.py}}
+{{out:d04_write_file.py}}
+<dl class="lines">
+  <dt><code>with open("atmosphere.csv", "w") as f:</code></dt>
+  <dd>Opens (or creates) the file for writing. <code>"w"</code> means write, and it <strong>replaces</strong> any existing file with that name. <code>f</code> is the name we give the open file. <code>with</code> makes sure the file is closed properly when the indented block ends.</dd>
+  <dt><code>f.write("altitude_m,…\n")</code></dt>
+  <dd>Writes text. <code>\n</code> is the special "new line" character. Without it, everything ends up on one line.</dd>
+  <dt><code>range(0, 30001, 5000)</code></dt>
+  <dd>0 to 30 000 in steps of 5000. The stop is 30001 so that 30000 is included.</dd>
+</dl>
+<p>The file it creates looks like this. Open it in Excel to see a table:</p>
+<txt label="atmosphere.csv">altitude_m,density_kg_m3,temperature_K
+0,1.22500,288.15
+5000,0.68025,255.65
+10000,0.37775,223.15
+...</txt>
+<p>Reading it back, in <code>d04_read_file.py</code>:</p>
+{{code:d04_read_file.py}}
+{{out:d04_read_file.py}}
+<dl class="lines">
+  <dt><code>open("atmosphere.csv", "r")</code></dt><dd><code>"r"</code> means read.</dd>
+  <dt><code>lines = f.readlines()</code></dt><dd>Reads the whole file into a list of strings, one per line.</dd>
+  <dt><code>for line in lines[1:]:</code></dt><dd>Skip line 0 (the header) with a slice.</dd>
+  <dt><code>line.strip().split(",")</code></dt><dd><code>strip()</code> removes the invisible newline at the end, and <code>split(",")</code> cuts the text at each comma, giving a list of pieces.</dd>
+  <dt><code>float(parts[0])</code></dt><dd>The pieces are text. <code>float()</code> converts text like <code>"5000"</code> into the number 5000.0.</dd>
+</dl>
+<p>On Day 6, NumPy does all of this in one line. It's still worth knowing what happens underneath.</p>
+
+<h3 id="d4-6"><span class="sec">4.6</span>Debugging: bugs that don't crash</h3>
+<p>The nastiest bugs give a wrong answer with no error. Make <code>d04_buggy.py</code>. The function says it wants kilometres:</p>
+{{code:d04_buggy.py}}
+{{out:d04_buggy.py}}
+<p>1.2207 kg/m³ at 30 km is clearly wrong, because it's almost sea-level density. How do you find the cause?</p>
+<ol>
+  <li><strong>Print the values in between.</strong> Add <code>print("h_km =", h_km)</code> inside the function. The values are fine. Then look at the formula: it divides kilometres by 8500, a number meant for metres. That's a <strong>units bug</strong>, the most common kind in engineering code.</li>
+  <li><strong>Use the VS Code debugger.</strong> Click just left of a line number to place a red dot (a <strong>breakpoint</strong>). Open the Run and Debug panel (the triangle-with-a-bug icon on the left, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>) and start "Python Debugger: Debug Python File". The program pauses at the red dot, and the <strong>Variables</strong> panel shows the value of every variable. Press <kbd>F10</kbd> to run one line at a time, and <kbd>F5</kbd> to continue to the next breakpoint.</li>
+</ol>
+{{code:d04_buggy_fixed.py}}
+{{out:d04_buggy_fixed.py}}
+<aside class="callout note">
+  <p class="callout-h">The sanity-check habit</p>
+  <p>Before trusting any number, ask "is this roughly what I expected?" Air at 30 km should be about 3% of sea-level density. This habit will save you on every OpenMDAO and Dymos result.</p>
+</aside>
+
+<div class="practice">
+<h3>Practice</h3>
+<ol class="ex">
+  <li><p><strong>Extend your module.</strong> Add <code>speed_of_sound(h)</code> to <code>atmos.py</code>. It's √(1.4 · 287 · T), where T comes from <code>temperature(h)</code>. Then in <code>d04_ex1.py</code>, import <code>atmos</code> and print the speed of sound every 5 km from 0 to 20 km.</p>
+    <details><summary>Show solution</summary>{{code:atmos_ex1.py|atmos.py (updated)}}{{code:d04_ex1.py}}{{out:d04_ex1.py}}</details></li>
+  <li><p><strong>Count the bad inputs.</strong> Loop over <code>[1000, -50, 12000, -3000, 25000]</code>, print the density for good altitudes, and use <code>try</code>/<code>except</code> to count how many were rejected.</p>
+    <details><summary>Show solution</summary>{{code:d04_ex2.py}}{{out:d04_ex2.py}}</details></li>
+  <li><p><strong>A full atmosphere table.</strong> Write <code>atmosphere_full.csv</code> with altitude, density, temperature and speed of sound every 1 km from 0 to 30 km. Open it in Excel or Google Sheets.</p>
+    <details><summary>Show solution</summary>{{code:d04_ex3.py}}{{out:d04_ex3.py}}</details></li>
+  <li><p><strong>Find the bug.</strong> This should print 361.7 km but prints 143.2 km. Use a print inside the loop, or the debugger, to see why, then fix it.</p>
+    {{code:d04_ex4_buggy.py}}
+    <details><summary>Show solution</summary><p><code>total = leg</code> <em>replaces</em> the total each time instead of adding to it. It must be <code>total = total + leg</code>. The debugging print shows the running total growing correctly.</p>{{code:d04_ex4.py}}{{out:d04_ex4.py}}</details></li>
+</ol>
+</div>
+
+<div class="checkpoint">
+<h3>Checkpoint</h3>
+<p>You can now:</p>
+<ul>
+  <li>import your own file as a module, and explain <code>if __name__ == "__main__":</code></li>
+  <li>import libraries with nicknames: <code>import numpy as np</code></li>
+  <li><code>raise</code> a clear error, and catch expected ones with <code>try</code>/<code>except</code></li>
+  <li>follow a traceback through several files</li>
+  <li>write and read a CSV file with <code>with open(...)</code></li>
+  <li>debug with prints and breakpoints, and check results for sanity</li>
+</ul>
+<label class="done"><input type="checkbox" id="done-4" data-day="4"> I've finished Day 4</label>
+</div>
+</section>

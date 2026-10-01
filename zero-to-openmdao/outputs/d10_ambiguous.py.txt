@@ -1,0 +1,33 @@
+Traceback (most recent call last):
+  File "d10_ambiguous.py", line 31, in <module>
+    result = p.run_driver()
+             ^^^^^^^^^^^^^^
+  File ".../site-packages/openmdao/utils/hooks.py", line 369, in __call__
+    ret = self.func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File ".../site-packages/openmdao/core/problem.py", line 735, in run_driver
+    self.final_setup()
+  File ".../site-packages/openmdao/utils/hooks.py", line 369, in __call__
+    ret = self.func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File ".../site-packages/openmdao/core/problem.py", line 1220, in final_setup
+    self._check_collected_errors()
+  File ".../site-packages/openmdao/utils/hooks.py", line 369, in __call__
+    ret = self.func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File ".../site-packages/openmdao/core/problem.py", line 641, in _check_collected_errors
+    raise RuntimeError('\n'.join(final_msg))
+RuntimeError: 
+Collected errors for problem 'd10_ambiguous':
+   <model> <class Group>: The following inputs promoted to 'x' have different values, so the value of 'x' is ambiguous:
+    
+   con.x      [1.]
+   parab.x    [0.]
+    
+   Call model.set_input_defaults('x', val=?) to remove the ambiguity.
+   <model> <class Group>: The following inputs promoted to 'y' have different values, so the value of 'y' is ambiguous:
+    
+   con.y      [1.]
+   parab.y    [0.]
+    
+   Call model.set_input_defaults('y', val=?) to remove the ambiguity.

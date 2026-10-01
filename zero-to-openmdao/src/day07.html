@@ -1,0 +1,132 @@
+<section class="day" id="day-7">
+<header class="day-head">
+  <p class="eyebrow">Week 2 · Scientific Python and OpenMDAO basics</p>
+  <h2><span class="dn">Day 7</span> Plots, equations of motion and SciPy optimizers</h2>
+  <dl class="meta">
+    <dt>Time</dt><dd>3–4 hours</dd>
+    <dt>Goal</dt><dd>Plot results, simulate equations of motion with a professional solver, and solve optimization problems with a real optimizer.</dd>
+  </dl>
+</header>
+
+<div class="warmup">
+  <h3>Warm-up from memory</h3>
+  <ol>
+    <li>What does <code>np.arange(0, 10, 3)</code> give?</li>
+    <li><code>a = np.array([2, 4, 6])</code>. What is <code>a[a &gt; 3]</code>?</li>
+    <li>Why use <code>np.exp</code> instead of <code>math.exp</code> on arrays?</li>
+  </ol>
+  <details class="answer"><summary>Answers</summary>
+    <p>1. <code>[0 3 6 9]</code>. 2. <code>[4 6]</code>. 3. <code>math.exp</code> only accepts a single number; <code>np.exp</code> works element by element on whole arrays.</p>
+  </details>
+</div>
+
+<h3 id="d7-1"><span class="sec">7.1</span>Plotting with Matplotlib</h3>
+<p>New file <code>d07_plot.py</code>:</p>
+{{code:d07_plot.py}}
+{{img:density.png|What d07_plot.py shows}}
+<dl class="lines">
+  <dt><code>import matplotlib.pyplot as plt</code></dt><dd>The plotting part of Matplotlib, nicknamed <code>plt</code> by everyone.</dd>
+  <dt><code>plt.plot(rho, h / 1000)</code></dt><dd>Draws a line through points. The <strong>first</strong> argument is the x values and the <strong>second</strong> the y values, and they must be the same length. Here density goes along the bottom and altitude in km up the side.</dd>
+  <dt><code>plt.xlabel</code>, <code>plt.ylabel</code>, <code>plt.title</code></dt><dd>Label the axes and the plot. Always put units in axis labels.</dd>
+  <dt><code>plt.grid(True)</code></dt><dd>Adds light grid lines.</dd>
+  <dt><code>plt.savefig("density.png", dpi=150)</code></dt><dd>Saves the picture into your folder. <code>dpi</code> sets the sharpness. Call it <em>before</em> <code>show</code>.</dd>
+  <dt><code>plt.show()</code></dt><dd>Opens a window with the plot. <strong>Your program pauses until you close the window.</strong></dd>
+</dl>
+<p>Several lines on one plot: call <code>plt.plot</code> several times before <code>plt.show()</code>, give each a <code>label="…"</code>, and call <code>plt.legend()</code>. Exercise 2 does this. To start a second, separate figure, call <code>plt.figure()</code> first.</p>
+
+<h3 id="d7-2"><span class="sec">7.2</span>Equations of motion with <code>solve_ivp</code></h3>
+<p>On Day 2 you wrote a simulation by hand with Euler steps. That method needs tiny steps to be accurate. SciPy's <code>solve_ivp</code> does the same job properly: it picks its own step sizes and keeps errors small. ("IVP" means <em>initial value problem</em>: you know the starting state and want to know what happens next.)</p>
+<p>You describe the physics as an <strong>ODE</strong> (ordinary differential equation). An ODE is a function that, given the time and the current <strong>state</strong>, returns the <strong>rates</strong> (how fast each part of the state changes). That's exactly the structure of your HGV <code>compute</code> and of every Dymos ODE. New file <code>d07_solve_ivp.py</code>:</p>
+{{code:d07_solve_ivp.py}}
+{{out:d07_solve_ivp.py}}
+{{img:projectile.png|What d07_solve_ivp.py shows}}
+<dl class="lines">
+  <dt><code>from scipy.integrate import solve_ivp</code></dt>
+  <dd>Imports the solver function from SciPy's <code>integrate</code> module.</dd>
+  <dt><code>def rates(t, state):</code></dt>
+  <dd>Your ODE. <code>solve_ivp</code> requires exactly these two parameters, in this order: the time, then the state (a list or array of numbers).</dd>
+  <dt><code>x, y, vx, vy = state</code></dt>
+  <dd>Unpack the state into readable names. The order is your choice, but you must keep it the same everywhere.</dd>
+  <dt><code>return [vx, vy, -k*speed*vx, -g - k*speed*vy]</code></dt>
+  <dd>The rates, <strong>in the same order as the state</strong>: dx/dt = vx, dy/dt = vy, then the two accelerations.</dd>
+  <dt><code>def hit_ground(t, state): return state[1]</code></dt>
+  <dd>An <strong>event function</strong>. <code>solve_ivp</code> watches its value and notices when it crosses zero, here when the height becomes 0.</dd>
+  <dt><code>hit_ground.terminal = True</code></dt>
+  <dd>Functions are objects too, so you can attach settings to them. <code>terminal = True</code> means "stop the simulation when this event happens".</dd>
+  <dt><code>hit_ground.direction = -1</code></dt>
+  <dd>Only count crossings going <em>downward</em> (positive to negative). Otherwise the start at height 0 could count.</dd>
+  <dt><code>solve_ivp(rates, (0, 100), start, events=hit_ground, max_step=0.05)</code></dt>
+  <dd>The ODE function, the time span (0 to 100 s at most), the starting state, the event, and a maximum step so the plotted curve is smooth.</dd>
+  <dt><code>sol.t</code> and <code>sol.y</code></dt>
+  <dd><code>sol.t</code> is the array of times. <code>sol.y</code> is a 2D array: row 0 is <code>x</code> at every time, row 1 is <code>y</code>, and so on, in your state order.</dd>
+  <dt><code>x[-1]</code></dt>
+  <dd>The last <code>x</code>, which is where it landed.</dd>
+</dl>
+<p>596.1 m is exactly what your hand-written Euler loop found in Day 2's exercise 4. Two independent methods agreeing is a good sign.</p>
+
+<h3 id="d7-3"><span class="sec">7.3</span>Optimization vocabulary</h3>
+<p>Every optimization problem has the same parts. OpenMDAO and Dymos use exactly these words:</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Word</th><th>Meaning</th><th>Cannonball example</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Design variable</strong></td><td>what the optimizer is allowed to change</td><td>launch angle</td></tr>
+    <tr><td><strong>Objective</strong></td><td>the single number to make as small (or large) as possible</td><td>range (make it large)</td></tr>
+    <tr><td><strong>Bounds</strong></td><td>the allowed range of each design variable</td><td>1° to 89°</td></tr>
+    <tr><td><strong>Constraint</strong></td><td>a condition on some <em>result</em> that must hold</td><td>e.g. peak height ≤ 150 m</td></tr>
+  </tbody>
+</table></div>
+<p>Optimizers <strong>minimize</strong> by convention. To <em>maximize</em> something, minimize its negative: the largest range is the smallest "minus range". You'll see this trick everywhere.</p>
+
+<h3 id="d7-4"><span class="sec">7.4</span>One design variable: <code>minimize_scalar</code></h3>
+<p>New file <code>d07_minimize_scalar.py</code>:</p>
+{{code:d07_minimize_scalar.py}}
+{{out:d07_minimize_scalar.py}}
+<dl class="lines">
+  <dt><code>def flight_range(angle_deg):</code></dt><dd>Wraps a whole simulation: angle in, range out. To the optimizer it's just a function.</dd>
+  <dt><code>rtol=1e-8, atol=1e-8</code></dt><dd>Accuracy settings for <code>solve_ivp</code>: smaller means more accurate. Optimizers need smooth, accurate answers, because a jumpy function confuses them.</dd>
+  <dt><code>sol.y[0, -1]</code></dt><dd>Row 0 (x), last column (the landing point).</dd>
+  <dt><code>def objective(angle_deg): return -flight_range(angle_deg)</code></dt><dd>The minus sign turns "maximize range" into "minimize". This is the trick from 7.3.</dd>
+  <dt><code>minimize_scalar(objective, bounds=(1, 89), method="bounded")</code></dt><dd>Finds the angle between 1° and 89° that makes <code>objective</code> smallest.</dd>
+  <dt><code>result.success</code>, <code>result.x</code>, <code>result.fun</code></dt><dd>Whether it worked, the best design variable, and the objective value there. We print <code>-result.fun</code> to turn it back into a positive range.</dd>
+</dl>
+<p>40.92° matches Day 3's brute-force 41°, but the optimizer used about 10 simulations instead of 89, and gives a precise answer instead of a whole degree.</p>
+
+<h3 id="d7-5"><span class="sec">7.5</span>Several design variables and a constraint: <code>minimize</code></h3>
+<p>The classic test function used in OpenMDAO's own tutorials is f(x, y) = (x−3)² + xy + (y+4)² − 3. New file <code>d07_minimize.py</code>:</p>
+{{code:d07_minimize.py}}
+{{out:d07_minimize.py}}
+<dl class="lines">
+  <dt><code>def f(xy):</code></dt><dd>With several design variables, SciPy passes them together in one array. <code>x, y = xy</code> unpacks them.</dd>
+  <dt><code>x0=[3.0, -4.0]</code></dt><dd>The <strong>starting guess</strong>. Optimizers walk downhill from here.</dd>
+  <dt><code>method="SLSQP"</code></dt><dd>A popular gradient-based optimizer that handles constraints. OpenMDAO will use the same one.</dd>
+  <dt><code>con = {"type": "ineq", "fun": x_plus_y}</code></dt><dd>A constraint written as a dictionary. <code>"ineq"</code> (inequality) means SciPy keeps <code>x_plus_y(xy) ≥ 0</code>.</dd>
+</dl>
+<p>Unconstrained, the best point is x = 6.67, y = −7.33, f = −27.33. When x + y must be ≥ 0, the best allowed point is x = 7, y = −7, f = −27. On Days 8 and 10 you'll solve exactly this problem in OpenMDAO and should get identical numbers.</p>
+
+<div class="practice">
+<h3>Practice</h3>
+<ol class="ex">
+  <li><p><strong>Log-scale atmosphere.</strong> Plot density from 0 to 100 km with <code>plt.xscale("log")</code>, so the very small densities high up are visible. Save it as <code>density_log.png</code>.</p>
+    <details><summary>Show solution</summary>{{code:d07_ex1.py}}{{img:density_log.png|With a log scale the exponential atmosphere is a straight line}}</details></li>
+  <li><p><strong>Compare launch angles.</strong> On one plot, draw the trajectories for 20°, 30°, 45° and 60° (with drag, k = 0.001), with a legend. Print each range.</p>
+    <details><summary>Show solution</summary>{{code:d07_ex2.py}}{{out:d07_ex2.py}}{{img:angles.png|Four trajectories with drag}}</details></li>
+  <li><p><strong>More drag.</strong> Use <code>minimize_scalar</code> to find the best angle with twice the drag (k = 0.002). Is it higher or lower than 40.9°?</p>
+    <details><summary>Show solution</summary>{{code:d07_ex3.py}}{{out:d07_ex3.py}}<p>Lower: more drag means a flatter best shot.</p></details></li>
+  <li><p><strong>Best glide ratio, properly.</strong> Use <code>minimize_scalar</code> to find the C<sub>L</sub> that maximizes L/D = C<sub>L</sub>/(0.02 + 0.1·C<sub>L</sub>²) between 0.01 and 1.5. Compare with Day 3's search.</p>
+    <details><summary>Show solution</summary>{{code:d07_ex4.py}}{{out:d07_ex4.py}}</details></li>
+</ol>
+</div>
+
+<div class="checkpoint">
+<h3>Checkpoint</h3>
+<p>You can now:</p>
+<ul>
+  <li>make labelled line plots, with several lines and a legend, and save them</li>
+  <li>write an ODE function <code>rates(t, state)</code> and solve it with <code>solve_ivp</code>, including a stop event</li>
+  <li>name the parts of an optimization: design variables, objective, bounds and constraints</li>
+  <li>maximize by minimizing the negative</li>
+  <li>use <code>minimize_scalar</code> and <code>minimize</code> (SLSQP) with a starting guess and constraints</li>
+</ul>
+<label class="done"><input type="checkbox" id="done-7" data-day="7"> I've finished Day 7</label>
+</div>
+</section>

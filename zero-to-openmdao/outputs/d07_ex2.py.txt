@@ -1,0 +1,4 @@
+20 deg: range 464.2 m
+30 deg: range 565.1 m
+45 deg: range 596.1 m
+60 deg: range 500.1 m
